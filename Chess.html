@@ -46,6 +46,40 @@
             max-width: 320px;
         }
 
+        /* Timer UI */
+        .clock-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #1e2124;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 26px;
+            font-weight: bold;
+            font-family: 'Consolas', 'Courier New', monospace;
+            color: #b9bbbe;
+            margin: 8px 0;
+            width: 100%;
+            max-width: 530px;
+            box-sizing: border-box;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            border: 2px solid transparent;
+            transition: all 0.2s ease;
+        }
+        .clock-label {
+            font-family: 'Segoe UI', sans-serif;
+            font-size: 16px;
+            font-weight: 600;
+            color: #8e9297;
+        }
+        .active-clock {
+            background: #ffffff;
+            color: #23272a;
+            border-color: #7289da;
+        }
+        .active-clock .clock-label { color: #23272a; }
+        .low-time { color: #f04747 !important; }
+
         /* Right Sidebar Elements */
         .status-box {
             background: #1e2124;
@@ -77,7 +111,7 @@
 
         label { font-size: 13px; color: #b9bbbe; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
         
-        select, button {
+        select, button, input[type="number"] {
             padding: 10px;
             font-size: 15px;
             border-radius: 5px;
@@ -86,7 +120,7 @@
             width: 100%;
             box-sizing: border-box;
         }
-        select { background: #fff; color: #000; font-weight: bold; }
+        select, input[type="number"] { background: #fff; color: #000; font-weight: bold; }
         button { background: #7289da; color: #fff; font-weight: bold; transition: 0.2s; }
         button:hover { background: #5b6eae; }
         
@@ -149,6 +183,7 @@
             width: 60px; height: 60px;
             display: flex; justify-content: center; align-items: center;
             font-size: 42px; cursor: pointer; position: relative; user-select: none;
+            transition: box-shadow 0.4s ease-out; /* Smooth fade effect for the outline */
         }
         .light { background-color: #f0d9b5; }
         .dark { background-color: #b58863; }
@@ -159,6 +194,16 @@
         .valid-move::after {
             content: ''; width: 18px; height: 18px;
             background-color: rgba(0, 0, 0, 0.2); border-radius: 50%; position: absolute;
+        }
+
+        /* Distinctive outlines for player moves */
+        .last-move-white {
+            box-shadow: inset 0 0 0 4px #ffffff !important;
+            z-index: 5;
+        }
+        .last-move-black {
+            box-shadow: inset 0 0 0 4px #000000 !important;
+            z-index: 5;
         }
 
         /* Review & History Panels */
@@ -177,6 +222,18 @@
         .inaccuracy { color: #f2ca5c; border-color: #f2ca5c; }
         .mistake { color: #e58f2a; border-color: #e58f2a; }
         .blunder { color: #ca3431; border-color: #ca3431; }
+
+        /* Animation for suggested moves */
+        .suggested-highlight {
+            animation: pulse-suggest 1.5s infinite;
+            z-index: 10;
+        }
+
+        @keyframes pulse-suggest {
+            0% { box-shadow: inset 0 0 0 4px rgba(49, 161, 77, 0.8); background-color: rgba(49, 161, 77, 0.4); }
+            50% { box-shadow: inset 0 0 0 6px rgba(49, 161, 77, 1); background-color: rgba(49, 161, 77, 0.7); }
+            100% { box-shadow: inset 0 0 0 4px rgba(49, 161, 77, 0.8); background-color: rgba(49, 161, 77, 0.4); }
+        }
 
         .history-section {
             background: #23272a;
@@ -221,7 +278,6 @@
         .btn-delete { background: #f04747; }
         .btn-delete:hover { background: #d84040; }
         
-        /* Scrollbar customization */
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #1e2124; border-radius: 4px; }
         ::-webkit-scrollbar-thumb { background: #7289da; border-radius: 4px; }
@@ -235,10 +291,20 @@
     <div class="main-layout">
         
         <div class="left-column">
+            <div class="clock-container" id="top-clock" style="display:none;">
+                <span class="clock-label" id="top-player-label">Opponent</span>
+                <span id="top-time">00:00</span>
+            </div>
+
             <div class="board-wrapper">
                 <div class="rank-labels" id="rank-labels"></div>
                 <div id="board" class="board"></div>
                 <div class="file-labels" id="file-labels"></div>
+            </div>
+
+            <div class="clock-container" id="bottom-clock" style="display:none;">
+                <span class="clock-label" id="bottom-player-label">Player</span>
+                <span id="bottom-time">00:00</span>
             </div>
         </div>
 
@@ -247,19 +313,37 @@
             <div id="status" class="status-box">White to move</div>
             
             <div class="controls" id="game-controls">
+                
+                <div class="control-group">
+                    <label for="time-control">Time Control</label>
+                    <select id="time-control" onchange="playUiSound(); toggleCustomTime(); resetGame()">
+                        <option value="0">No Timer (Casual)</option>
+                        <option value="1">Bullet (1 min)</option>
+                        <option value="5">Blitz (5 min)</option>
+                        <option value="10" selected>Rapid (10 min)</option>
+                        <option value="60">Classical (1 Hour)</option>
+                        <option value="custom">Custom Time...</option>
+                    </select>
+                    <div id="custom-time-container" style="display:none; margin-top:5px; flex-direction:row; gap:5px;">
+                        <input type="number" id="custom-hours" placeholder="Hrs" value="0" min="0" max="24" onchange="resetGame()">
+                        <input type="number" id="custom-minutes" placeholder="Min" value="3" min="0" max="59" onchange="resetGame()">
+                        <input type="number" id="custom-seconds" placeholder="Sec" value="0" min="0" max="59" onchange="resetGame()">
+                    </div>
+                </div>
+
                 <div class="control-group">
                     <label for="mode">Game Mode</label>
                     <select id="mode" onchange="playUiSound(); toggleGameMode()">
                         <option value="friend">Play with Friend (Local)</option>
-                        <option value="bot">Play with Bot</option>
+                        <option value="bot" selected>Play with Bot</option>
                     </select>
                 </div>
 
-                <div class="control-group" id="diff-container" style="display: none;">
+                <div class="control-group" id="diff-container">
                     <label for="difficulty">Bot Difficulty</label>
-                    <select id="difficulty" onchange="playUiSound()">
+                    <select id="difficulty" onchange="playUiSound(); resetGame()">
                         <option value="easy">Easy</option>
-                        <option value="normal">Normal</option>
+                        <option value="normal" selected>Normal</option>
                         <option value="hard">Hard</option>
                         <option value="impossible">Impossible</option>
                     </select>
@@ -278,7 +362,8 @@
                 </label>
 
                 <button onclick="playUiSound(); resetGame()">Restart Game</button>
-                <button id="review-btn" onclick="playUiSound(); startReview()">Analyze Game</button>
+                <button id="resign-btn" onclick="playUiSound(); resignGame()" style="background: #f04747; display: none;">Resign Game</button>
+                <button id="review-btn" onclick="playUiSound(); prepareAnalysis()">Analyze Game</button>
             </div>
 
             <div class="review-controls" id="review-controls" style="display: none;">
@@ -289,6 +374,7 @@
             </div>
             
             <div id="review-panel" class="review-panel" style="display: none;">
+                <div id="opening-name" style="color: #7289da; font-size: 14px; margin-bottom: 8px;"></div>
                 <span id="review-actor" style="color: white; font-size: 15px; display:block; margin-bottom: 5px;"></span>
                 <span id="review-text"></span>
             </div>
@@ -323,9 +409,24 @@
         let gameFens = [];
         let gameEvals = [];
         let gameNotationMoves = [];
+        let gameLastMoves = [];
+        let gameTimesWhite = [];
+        let gameTimesBlack = [];
+        let suggestedMoves = []; // Stores our pre-calculated best moves
+        
         let isReviewMode = false;
+        let isAnalyzing = false;
         let reviewIndex = 0;
         let gameSaved = false;
+        let lastMoveTimestamp = 0; // Tracks when a move was made for the 1s outline
+
+        /* Precision Tracking Timer Variables */
+        let timerWhite = 0; 
+        let timerBlack = 0; 
+        let lastUpdateTime = 0; 
+        let useTimer = false;
+        let timerInterval = null;
+        let gameActive = false;
 
         const piecesMap = { 'p': '♟', 'n': '♞', 'b': '♝', 'r': '♜', 'q': '♛', 'k': '♚' };
 
@@ -339,6 +440,240 @@
             'a2', 'b2', 'c2', 'd2', 'e2', 'f2', 'g2', 'h2',
             'a1', 'b1', 'c1', 'd1', 'e1', 'f1', 'g1', 'h1'
         ];
+
+        /* --- CHESS OPENINGS DICTIONARY --- */
+        const chessOpenings = {
+            // Open Games (1.e4 e5)
+            "e4": "King's Pawn Game",
+            "e4 e5": "Open Game",
+            "e4 e5 Nf3": "King's Knight Opening",
+            "e4 e5 Nf3 Nc6": "Open Game: Normal Variation",
+            "e4 e5 Nf3 Nc6 Bb5": "Ruy Lopez",
+            "e4 e5 Nf3 Nc6 Bb5 a6": "Ruy Lopez: Morphy Defense",
+            "e4 e5 Nf3 Nc6 Bb5 a6 Ba4": "Ruy Lopez: Morphy Defense, Deferred",
+            "e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6": "Ruy Lopez: Morphy Defense, Main Line",
+            "e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O": "Ruy Lopez: Morphy Defense, Castled",
+            "e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O Be7": "Ruy Lopez: Closed Defense",
+            "e4 e5 Nf3 Nc6 Bb5 Nf6": "Ruy Lopez: Berlin Defense",
+            "e4 e5 Nf3 Nc6 Bb5 f5": "Ruy Lopez: Schliemann Defense",
+            "e4 e5 Nf3 Nc6 Bb5 Bc5": "Ruy Lopez: Classical Defense",
+            "e4 e5 Nf3 Nc6 Bb5 g6": "Ruy Lopez: Smyslov Defense",
+            "e4 e5 Nf3 Nc6 Bb5 Nd4": "Ruy Lopez: Bird Defense",
+            "e4 e5 Nf3 Nc6 Bb5 d6": "Ruy Lopez: Steinitz Defense",
+            "e4 e5 Nf3 Nc6 Bc4": "Italian Game",
+            "e4 e5 Nf3 Nc6 Bc4 Bc5": "Giuoco Piano",
+            "e4 e5 Nf3 Nc6 Bc4 Bc5 c3": "Giuoco Piano: Center Attack",
+            "e4 e5 Nf3 Nc6 Bc4 Bc5 b4": "Evans Gambit",
+            "e4 e5 Nf3 Nc6 Bc4 Nf6": "Two Knights Defense",
+            "e4 e5 Nf3 Nc6 Bc4 Nf6 Ng5": "Two Knights Defense: Fried Liver / Knight Attack",
+            "e4 e5 Nf3 Nc6 Bc4 Nf6 d4": "Two Knights Defense: Modern Variation",
+            "e4 e5 Nf3 Nc6 d4": "Scotch Game",
+            "e4 e5 Nf3 Nc6 d4 exd4": "Scotch Game: Main Line",
+            "e4 e5 Nf3 Nc6 d4 exd4 Nxd4": "Scotch Game: Classical Variation",
+            "e4 e5 Nf3 Nc6 d4 exd4 c3": "Goring Gambit",
+            "e4 e5 Nf3 Nc6 Nc3": "Three Knights Game",
+            "e4 e5 Nf3 Nc6 Nc3 Nf6": "Four Knights Game",
+            "e4 e5 Nf3 Nc6 Nc3 Nf6 Bb5": "Four Knights: Spanish Variation",
+            "e4 e5 Nf3 Nc6 Nc3 Nf6 Bc4": "Four Knights: Italian Variation",
+            "e4 e5 Nf3 d6": "Philidor Defense",
+            "e4 e5 Nf3 Nf6": "Petrov's Defense",
+            "e4 e5 Nf3 Nf6 Nxe5": "Petrov's Defense: Classical Line",
+            "e4 e5 Nf3 Nf6 Nxe5 d6 Nf3 Nxe4 d4": "Petrov's Defense: Modern Attack",
+            "e4 e5 Nf3 f5": "Latvian Gambit",
+            "e4 e5 Nf3 d5": "Elephant Gambit",
+            "e4 e5 f4": "King's Gambit",
+            "e4 e5 f4 exd4": "King's Gambit Accepted",
+            "e4 e5 f4 exd4 Nf3": "King's Gambit Accepted: King's Knight Gambit",
+            "e4 e5 f4 exd4 Bc4": "King's Gambit Accepted: Bishop's Gambit",
+            "e4 e5 f4 d5": "King's Gambit: Falkbeer Countergambit",
+            "e4 e5 Nc3": "Vienna Game",
+            "e4 e5 Nc3 Nf6": "Vienna Game: Falkbeer Variation",
+            "e4 e5 Nc3 Nc6": "Vienna Game: Max Lange Defense",
+            "e4 e5 Nc3 Nf6 f4": "Vienna Gambit",
+            "e4 e5 d4": "Center Game",
+            "e4 e5 d4 exd4 Qxd4": "Center Game: Main Line",
+            "e4 e5 d4 exd4 c3": "Danish Gambit",
+            "e4 e5 Nf3 f6": "Damiano Defense",
+            "e4 e5 Qh5": "Danvers Opening (Scholar's Mate)",
+
+            // Semi-Open Games (1.e4 other)
+            "e4 c5": "Sicilian Defense",
+            "e4 c5 Nf3": "Sicilian Defense: Open Opening",
+            "e4 c5 Nf3 d6": "Sicilian: Traditional Setup",
+            "e4 c5 Nf3 d6 d4": "Sicilian Defense: Open",
+            "e4 c5 Nf3 d6 d4 cxd4": "Sicilian: Open Main Line",
+            "e4 c5 Nf3 d6 d4 cxd4 Nxd4": "Sicilian: Open Main Line",
+            "e4 c5 Nf3 d6 d4 Nxd4 Nf6": "Sicilian: Open, Two Knights",
+            "e4 c5 Nf3 d6 d4 Nxd4 Nf6 Nc3": "Sicilian: Classical Open",
+            "e4 c5 Nf3 d6 d4 Nxd4 Nf6 Nc3 a6": "Sicilian: Najdorf Variation",
+            "e4 c5 Nf3 d6 d4 Nxd4 Nf6 Nc3 g6": "Sicilian: Dragon Variation",
+            "e4 c5 Nf3 d6 d4 Nxd4 Nf6 Nc3 Nc6": "Sicilian: Classical Variation",
+            "e4 c5 Nf3 Nc6": "Sicilian Defense: Old Sicilian",
+            "e4 c5 Nf3 Nc6 d4": "Sicilian Defense: Open with Nc6",
+            "e4 c5 Nf3 Nc6 d4 cxd4": "Sicilian: Open with Nc6",
+            "e4 c5 Nf3 Nc6 d4 Nxd4": "Sicilian: Open with Nc6",
+            "e4 c5 Nf3 Nc6 d4 Nxd4 g6": "Sicilian: Accelerated Dragon",
+            "e4 c5 Nf3 Nc6 Bb5": "Sicilian: Rossolimo Attack",
+            "e4 c5 Nf3 e6": "Sicilian: French Variation",
+            "e4 c5 Nf3 e6 d4": "Sicilian: Open French Line",
+            "e4 c5 Nf3 e6 d4 cxd4": "Sicilian: Open French Line",
+            "e4 c5 Nf3 e6 d4 Nxd4": "Sicilian: Taimanov/Kan Setup",
+            "e4 c5 Nf3 e6 d4 Nxd4 Nc6": "Sicilian: Taimanov Variation",
+            "e4 c5 Nf3 e6 d4 Nxd4 a6": "Sicilian: Kan Variation",
+            "e4 c5 c3": "Sicilian: Alapin Variation (Anti-Sicilian)",
+            "e4 c5 Nc3": "Closed Sicilian",
+            "e4 c5 Nc3 Nc6": "Closed Sicilian Setup",
+            "e4 c5 Nc3 Nc6 g3 g6 Bg2 Bg7 d3 d6": "Closed Sicilian: Main Line",
+            "e4 c5 f4": "Sicilian: Grand Prix Attack",
+            "e4 c5 d4": "Sicilian: Smith-Morra Gambit",
+            "e4 c5 d4 cxd4 c3": "Sicilian: Smith-Morra Gambit Accepted",
+            "e4 c5 b4": "Sicilian: Wing Gambit",
+
+            "e4 e6": "French Defense",
+            "e4 e6 d4": "French Defense: Normal",
+            "e4 e6 d4 d5": "French Defense: Main Line",
+            "e4 e6 d4 d5 e5": "French Defense: Advance Variation",
+            "e4 e6 d4 d5 Nc3": "French Defense: Paulsen",
+            "e4 e6 d4 d5 Nc3 Nf6": "French Defense: Classical Variation",
+            "e4 e6 d4 d5 Nc3 Bb4": "French Defense: Winawer Variation",
+            "e4 e6 d4 d5 Nd2": "French Defense: Tarrasch Variation",
+            "e4 e6 d4 d5 exd5": "French Defense: Exchange Variation",
+            "e4 e6 d3": "French: King's Indian Attack",
+
+            "e4 c6": "Caro-Kann Defense",
+            "e4 c6 d4": "Caro-Kann: Normal",
+            "e4 c6 d4 d5": "Caro-Kann Defense: Main Line",
+            "e4 c6 d4 d5 e5": "Caro-Kann Defense: Advance Variation",
+            "e4 c6 d4 d5 Nc3": "Caro-Kann Defense: Classical",
+            "e4 c6 d4 d5 Nc3 dxe4": "Caro-Kann: Classical Variation",
+            "e4 c6 d4 d5 Nc3 dxe4 Nxe4 Bf5": "Caro-Kann: Classical, Classical Line",
+            "e4 c6 d4 d5 Nc3 dxe4 Nxe4 Nf6": "Caro-Kann: Tartakower/Deves Variation",
+            "e4 c6 d4 d5 exd5": "Caro-Kann Defense: Exchange Variation",
+            "e4 c6 d4 d5 exd5 cxd5 c4": "Caro-Kann: Panov-Botvinnik Attack",
+            "e4 c6 c4": "Caro-Kann: Accelerated Panov",
+
+            "e4 d5": "Scandinavian Defense",
+            "e4 d5 exd5": "Scandinavian Defense: Exchange",
+            "e4 d5 exd5 Qxd5": "Scandinavian Defense: Main Line",
+            "e4 d5 exd5 Qxd5 Nc3": "Scandinavian Defense: Main Line with Nc3",
+            "e4 d5 exd5 Qxd5 Nc3 Qa5": "Scandinavian: Classical Variation",
+            "e4 d5 exd5 Nf6": "Scandinavian Defense: Modern Variation",
+
+            "e4 d6": "Pirc Defense",
+            "e4 d6 d4": "Pirc Defense: Standard",
+            "e4 d6 d4 Nf6": "Pirc Defense: Main Line",
+            "e4 d6 d4 Nf6 Nc3": "Pirc Defense: Main Setup",
+            "e4 d6 d4 Nf6 Nc3 g6": "Pirc Defense: Main Line",
+            "e4 d6 d4 Nf6 Nc3 g6 f4": "Pirc Defense: Austrian Attack",
+
+            "e4 g6": "Modern Defense",
+            "e4 g6 d4 Bg7": "Modern Defense: Standard",
+            "e4 Nf6": "Alekhine's Defense",
+            "e4 Nf6 e5 Nd5": "Alekhine's Defense: Main Line",
+            "e4 Nf6 e5 Nd5 d4 d6 c4 Nb6 f4": "Alekhine: Four Pawns Attack",
+            "e4 Nf6 e5 Nd5 d4 d6 Nf3": "Alekhine: Modern Variation",
+            "e4 Nc6": "Nimzowitsch Defense",
+
+            // Closed Games (1.d4 d5)
+            "d4": "Queen's Pawn Game",
+            "d4 d5": "Closed Game",
+            "d4 d5 c4": "Queen's Gambit",
+            "d4 d5 c4 dxc4": "Queen's Gambit Accepted",
+            "d4 d5 c4 dxc4 Nf3": "Queen's Gambit Accepted: Central Line",
+            "d4 d5 c4 e6": "Queen's Gambit Declined",
+            "d4 d5 c4 e6 Nc3": "Queen's Gambit Declined: Traditional",
+            "d4 d5 c4 e6 Nc3 Nf6": "Queen's Gambit Declined: Main Line",
+            "d4 d5 c4 e6 Nc3 Nf6 Nf3": "Queen's Gambit Declined: Three Knights",
+            "d4 d5 c4 e6 Nc3 Nf6 Bg5": "Queen's Gambit Declined: Classical",
+            "d4 d5 c4 e6 Nf3 Nf6": "Queen's Gambit Declined: Neo-Orthodox",
+            "d4 d5 c4 c6": "Slav Defense",
+            "d4 d5 c4 c6 Nf3 Nf6 Nc3 dxc4": "Slav Defense: Czech Variation",
+            "d4 d5 c4 c6 Nc3 Nf6 e3": "Semi-Slav Defense",
+            "d4 d5 c4 c6 Nf3 Nf6 Nc3 e3": "Semi-Slav Defense: Main Line",
+            "d4 d5 c4 e5": "Albin Countergambit",
+            "d4 d5 c4 Nc6": "Chigorin Defense",
+            "d4 d5 Nf3": "Queen's Pawn Game: Symmetric",
+            "d4 d5 Nf3 Nf6": "Queen's Pawn Game: Symmetrical Variation",
+            "d4 d5 Nf3 Nf6 Bf4": "London System",
+            "d4 d5 e3": "Stonewall Attack",
+            "d4 d5 e4": "Blackmar-Diemer Gambit",
+
+            // Indian Defenses (1.d4 Nf6)
+            "d4 Nf6": "Indian Defense",
+            "d4 Nf6 c4": "Indian Defense: Normal",
+            "d4 Nf6 c4 e6": "Indian Defense: East Indian Setup",
+            "d4 Nf6 c4 e6 Nc3": "Indian Defense: Neo-Classical",
+            "d4 Nf6 c4 e6 Nc3 Bb4": "Nimzo-Indian Defense",
+            "d4 Nf6 c4 e6 Nf3": "Indian Defense: Classical Variation",
+            "d4 Nf6 c4 e6 Nf3 b6": "Queen's Indian Defense",
+            "d4 Nf6 c4 e6 Nf3 d5": "Queen's Gambit Declined: Transposition",
+            "d4 Nf6 c4 e6 g3": "Catalan Opening",
+            "d4 Nf6 c4 e6 g3 d5": "Catalan Opening: Closed",
+            "d4 Nf6 c4 g6": "King's Indian Setup",
+            "d4 Nf6 c4 g6 Nc3": "King's Indian / Grünfeld Setup",
+            "d4 Nf6 c4 g6 Nc3 Bg7": "King's Indian Defense",
+            "d4 Nf6 c4 g6 Nc3 Bg7 e4 d6": "King's Indian Defense: Main Line",
+            "d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 Nf3": "King's Indian Defense: Classical Variation",
+            "d4 Nf6 c4 g6 Nc3 d5": "Grünfeld Defense",
+            "d4 Nf6 c4 g6 Nc3 d5 Nf3 Bg7": "Grünfeld Defense: Three Knights",
+            "d4 Nf6 c4 c5": "Benoni Defense",
+            "d4 Nf6 c4 c5 d5": "Modern Benoni",
+            "d4 Nf6 c4 c5 d5 b5": "Benko Gambit",
+            "d4 Nf6 c4 e5": "Budapest Gambit",
+
+            // Other Queen's Pawn Openings
+            "d4 f5": "Dutch Defense",
+            "d4 f5 g3": "Dutch Defense: Fianchetto",
+            "d4 f5 e4": "Dutch Defense: Staunton Gambit",
+            "d4 d6": "Wade Defense",
+
+            // Flank Openings
+            "c4": "English Opening",
+            "c4 e5": "English Opening: King's English",
+            "c4 e5 Nc3": "English Opening: King's English, Reverse Sicilian",
+            "c4 c5": "English Opening: Symmetrical Variation",
+            "c4 c5 Nf3 Nf6 Nc3 Nc6": "English Opening: Symmetrical, Four Knights",
+            "c4 Nf6": "English Opening: Anglo-Indian Defence",
+            "c4 e6": "English Opening: Agincourt Defence",
+            "c4 c6": "English Opening: Caro-Kann Defensive System",
+
+            "Nf3": "Zukertort Opening / Réti Opening",
+            "Nf3 d5": "Réti Opening: Main Line",
+            "Nf3 d5 c4": "Réti Opening",
+            "Nf3 d5 c4 d4": "Réti Opening: Advance Variation",
+            "Nf3 Nf6": "Zukertort: Symmetrical",
+            "Nf3 c5": "Zukertort: Sicilian Invitation",
+
+            "b3": "Larsen's Opening",
+            "b3 d5": "Larsen's Opening: Classical Variation",
+            "f4": "Bird's Opening",
+            "f4 d5": "Bird's Opening: Dutch Variation",
+            "g3": "King's Fianchetto Opening (Benko's Opening)",
+            "b4": "Sokolsky Opening (Polish / Orangutan)",
+            "g4": "Grob Attack",
+            "Nc3": "Dunst Opening",
+            "a3": "Anderssen's Opening",
+            "d3": "Mieses Opening",
+            "e3": "Van 't Kruijs Opening",
+            "h3": "Clemenz Opening",
+            "a4": "Ware Opening",
+            "h4": "Kadas Opening",
+            "Nh3": "Amar Opening",
+            "Na3": "Durkin Opening",
+            "f3": "Gedult's Opening / Barnes Opening"
+        };
+
+        function getOpeningName(moves) {
+            let currentSequence = "";
+            let bestMatch = "Standard Opening";
+            for (let i = 0; i < moves.length && i < 10; i++) {
+                currentSequence += (currentSequence ? " " : "") + moves[i];
+                if (chessOpenings[currentSequence]) {
+                    bestMatch = chessOpenings[currentSequence];
+                }
+            }
+            return bestMatch;
+        }
 
         /* --- SOUND ENGINE --- */
         let audioCtx = null;
@@ -388,6 +723,193 @@
             else playSound('move');
         }
 
+        /* --- TIMER LOGIC --- */
+        function toggleCustomTime() {
+            const val = document.getElementById('time-control').value;
+            document.getElementById('custom-time-container').style.display = (val === 'custom') ? 'flex' : 'none';
+        }
+
+        function formatTime(ms) {
+            let totalSeconds = Math.ceil(ms / 1000);
+            if (totalSeconds < 0) totalSeconds = 0;
+            let h = Math.floor(totalSeconds / 3600);
+            let m = Math.floor((totalSeconds % 3600) / 60);
+            let s = totalSeconds % 60;
+            let res = '';
+            if (h > 0) res += h + ':';
+            res += (m < 10 && h > 0 ? '0' + m : m) + ':';
+            res += (s < 10 ? '0' + s : s);
+            return res;
+        }
+
+        function setupTimers() {
+            clearInterval(timerInterval);
+            const val = document.getElementById('time-control').value;
+            let totalMs = 0;
+            
+            if (val === '0') {
+                useTimer = false;
+                document.getElementById('top-clock').style.display = 'none';
+                document.getElementById('bottom-clock').style.display = 'none';
+                return;
+            } else if (val === 'custom') {
+                const h = parseInt(document.getElementById('custom-hours').value) || 0;
+                const m = parseInt(document.getElementById('custom-minutes').value) || 0;
+                const s = parseInt(document.getElementById('custom-seconds').value) || 0;
+                totalMs = (h * 3600 + m * 60 + s) * 1000;
+                
+                // Prevent setting 0 time if custom is selected; default to 1 min
+                if (totalMs <= 0) totalMs = 60000; 
+            } else {
+                totalMs = parseInt(val) * 60 * 1000;
+            }
+            
+            useTimer = true;
+            timerWhite = totalMs;
+            timerBlack = totalMs;
+            
+            document.getElementById('top-clock').style.display = 'flex';
+            document.getElementById('bottom-clock').style.display = 'flex';
+            updateClockUI();
+        }
+
+        function updateClockUI() {
+            if (!useTimer) return;
+            const pColor = document.getElementById('player-color').value;
+            const isFlipped = (pColor === 'b');
+            const mode = document.getElementById('mode').value;
+            
+            const topTimeEl = document.getElementById('top-time');
+            const bottomTimeEl = document.getElementById('bottom-time');
+            const topLabelEl = document.getElementById('top-player-label');
+            const bottomLabelEl = document.getElementById('bottom-player-label');
+            const topClock = document.getElementById('top-clock');
+            const bottomClock = document.getElementById('bottom-clock');
+            
+            if (mode === 'bot') {
+                topLabelEl.innerText = isFlipped ? "Bot (White)" : "Bot (Black)";
+                bottomLabelEl.innerText = isFlipped ? "You (Black)" : "You (White)";
+            } else {
+                topLabelEl.innerText = isFlipped ? "White" : "Black";
+                bottomLabelEl.innerText = isFlipped ? "Black" : "White";
+            }
+            
+            let topTimeMs = isFlipped ? timerWhite : timerBlack;
+            let bottomTimeMs = isFlipped ? timerBlack : timerWhite;
+
+            if (isReviewMode && gameTimesWhite && gameTimesWhite[reviewIndex] !== undefined) {
+                const revTimeW = gameTimesWhite[reviewIndex];
+                const revTimeB = gameTimesBlack[reviewIndex];
+                topTimeMs = isFlipped ? revTimeW : revTimeB;
+                bottomTimeMs = isFlipped ? revTimeB : revTimeW;
+            }
+
+            topTimeEl.innerText = formatTime(topTimeMs);
+            bottomTimeEl.innerText = formatTime(bottomTimeMs);
+            
+            topClock.classList.remove('active-clock');
+            bottomClock.classList.remove('active-clock');
+            topTimeEl.classList.remove('low-time');
+            bottomTimeEl.classList.remove('low-time');
+            
+            if (gameActive && !game.game_over() && !isReviewMode && !isAnalyzing) {
+                if (game.turn() === 'w') {
+                    if (isFlipped) topClock.classList.add('active-clock');
+                    else bottomClock.classList.add('active-clock');
+                } else {
+                    if (isFlipped) bottomClock.classList.add('active-clock');
+                    else topClock.classList.add('active-clock');
+                }
+            }
+            
+            if (topTimeMs <= 30000 && topTimeMs > 0) topTimeEl.classList.add('low-time');
+            if (bottomTimeMs <= 30000 && bottomTimeMs > 0) bottomTimeEl.classList.add('low-time');
+        }
+
+        function startTimer() {
+            if (!useTimer || gameActive) return;
+            gameActive = true;
+            lastUpdateTime = Date.now();
+
+            timerInterval = setInterval(() => {
+                if (!gameActive || game.game_over() || isReviewMode || isAnalyzing) {
+                    clearInterval(timerInterval);
+                    return;
+                }
+                
+                const now = Date.now();
+                const delta = now - lastUpdateTime;
+                lastUpdateTime = now;
+
+                if (game.turn() === 'w') {
+                    timerWhite -= delta;
+                    if (timerWhite <= 0) { timerWhite = 0; handleTimeout('w'); }
+                } else {
+                    timerBlack -= delta;
+                    if (timerBlack <= 0) { timerBlack = 0; handleTimeout('b'); }
+                }
+                updateClockUI();
+            }, 100); 
+            updateClockUI();
+        }
+
+        function updateTimeOnMove() {
+            if (!useTimer || !gameActive) return;
+            const now = Date.now();
+            const delta = now - lastUpdateTime;
+            lastUpdateTime = now;
+
+            if (game.turn() === 'w') {
+                timerWhite -= delta;
+                if (timerWhite <= 0) { timerWhite = 0; handleTimeout('w'); }
+            } else {
+                timerBlack -= delta;
+                if (timerBlack <= 0) { timerBlack = 0; handleTimeout('b'); }
+            }
+            updateClockUI();
+        }
+
+        function handleTimeout(loserColor) {
+            gameActive = false;
+            clearInterval(timerInterval);
+            playSound('end');
+            
+            let winnerColorStr = loserColor === 'w' ? 'Black' : 'White';
+            
+            statusEl.innerHTML = `Game over, ${winnerColorStr} wins on time.`;
+            document.getElementById('review-btn').style.display = "block"; 
+            document.getElementById('resign-btn').style.display = "none";
+            
+            if (!gameSaved) {
+                gameSaved = true;
+                saveGameToHistory(`${winnerColorStr} Wins (Timeout)`);
+            }
+            updateClockUI();
+        }
+
+        function resignGame() {
+            if (game.game_over() || isReviewMode || isAnalyzing || !gameActive) return;
+            
+            gameActive = false;
+            clearInterval(timerInterval);
+            playSound('end');
+            
+            const playerColor = document.getElementById('player-color').value;
+            let winnerColorStr = playerColor === 'w' ? 'Black' : 'White';
+            let loserColorStr = playerColor === 'w' ? 'White' : 'Black';
+            
+            statusEl.innerHTML = `Game over, ${loserColorStr} resigned. ${winnerColorStr} wins.`;
+            
+            document.getElementById('resign-btn').style.display = "none";
+            document.getElementById('review-btn').style.display = "block"; 
+            
+            if (!gameSaved) {
+                gameSaved = true;
+                saveGameToHistory(`${winnerColorStr} Wins (Resignation)`);
+            }
+            updateClockUI();
+        }
+
         /* --- GAME LOGIC --- */
         function toggleGameMode() {
             const mode = document.getElementById('mode').value;
@@ -400,16 +922,26 @@
             selectedSquare = null;
             validTargetSquares = [];
             isReviewMode = false;
+            isAnalyzing = false;
             gameSaved = false;
+            gameActive = false;
+            lastMoveTimestamp = Date.now();
             
+            setupTimers();
+
             gameFens = [game.fen()];
             gameEvals = [0]; 
             gameNotationMoves = [""];
+            gameLastMoves = [null];
+            gameTimesWhite = [timerWhite];
+            gameTimesBlack = [timerBlack];
+            suggestedMoves = [];
 
             document.getElementById('main-title').innerText = "Standard Chess (Ultra Fast Engine)";
             document.getElementById('game-controls').style.display = "flex";
             document.getElementById('review-controls').style.display = "none";
             document.getElementById('review-btn').style.display = "none";
+            document.getElementById('resign-btn').style.display = "block"; 
             reviewPanelEl.style.display = "none";
             historySectionEl.style.display = "flex";
             
@@ -427,6 +959,10 @@
         function recordMove(moveObj) {
             gameFens.push(game.fen());
             gameNotationMoves.push(moveObj.san);
+            gameLastMoves.push({ from: moveObj.from, to: moveObj.to, color: moveObj.color });
+            gameTimesWhite.push(timerWhite);
+            gameTimesBlack.push(timerBlack);
+            lastMoveTimestamp = Date.now(); // Record exact timestamp for the 1s outline
             let currentEval = minimax(2, -Infinity, Infinity, game.turn() === 'w');
             gameEvals.push(currentEval);
         }
@@ -448,6 +984,14 @@
             rankLabelsEl.innerHTML = ranksHTML;
             fileLabelsEl.innerHTML = filesHTML;
 
+            const currentIndex = isReviewMode ? reviewIndex : (gameFens.length - 1);
+            const lastMove = gameLastMoves[currentIndex];
+            const timeSinceMove = Date.now() - lastMoveTimestamp;
+            
+            // Should we show the outline?
+            // In review mode, always show it. In live play, only show if less than 1000ms has passed.
+            let showOutline = isReviewMode || isAnalyzing || timeSinceMove <= 1000;
+
             for (let r = 0; r < 8; r++) {
                 for (let c = 0; c < 8; c++) {
                     const chessJsRow = isFlipped ? (7 - r) : r;
@@ -466,6 +1010,25 @@
                     if (selectedSquare === squareId) square.classList.add('selected');
                     if (validTargetSquares.includes(squareId)) square.classList.add('valid-move');
                     
+                    // Apply white/black move outlines
+                    if (lastMove && (squareId === lastMove.from || squareId === lastMove.to) && showOutline) {
+                        if (lastMove.color === 'w') {
+                            square.classList.add('last-move-white');
+                        } else {
+                            square.classList.add('last-move-black');
+                        }
+                        
+                        // Set timeout to remove the outline class smoothly EXACTLY at the 1 second mark during live play
+                        if (!isReviewMode && !isAnalyzing) {
+                            setTimeout(() => {
+                                if (document.getElementById(squareId)) {
+                                    document.getElementById(squareId).classList.remove('last-move-white');
+                                    document.getElementById(squareId).classList.remove('last-move-black');
+                                }
+                            }, 1000 - timeSinceMove);
+                        }
+                    }
+
                     const piece = board[chessJsRow][chessJsCol];
                     if (piece) {
                         const pieceSpan = document.createElement('span');
@@ -474,7 +1037,7 @@
                         square.appendChild(pieceSpan);
                     }
                     
-                    if(!isReviewMode) {
+                    if(!isReviewMode && !isAnalyzing) {
                         square.onclick = () => handleSquareClick(squareId);
                     }
                     boardEl.appendChild(square);
@@ -484,7 +1047,7 @@
 
         function handleSquareClick(squareId) {
             initAudio(); 
-            if (game.game_over() || isReviewMode) return;
+            if (game.game_over() || isReviewMode || isAnalyzing || (useTimer && (timerWhite === 0 || timerBlack === 0))) return;
             
             const mode = document.getElementById('mode').value;
             const playerColor = document.getElementById('player-color').value;
@@ -494,17 +1057,21 @@
             const pieceOnSquare = game.get(squareId);
 
             if (selectedSquare && validTargetSquares.includes(squareId)) {
+                if (useTimer && gameActive) updateTimeOnMove();
+
                 const moveResult = game.move({ from: selectedSquare, to: squareId, promotion: 'q' });
                 
                 if (moveResult) {
                     recordMove(moveResult); 
                     handleGameSound(moveResult);
+                    if (useTimer && !gameActive) startTimer();
                 }
 
                 selectedSquare = null;
                 validTargetSquares = [];
                 drawBoard();
                 updateStatus();
+                updateClockUI();
 
                 if (mode === 'bot' && !game.game_over()) {
                     makeBotMove();
@@ -517,17 +1084,21 @@
                     selectedSquare = null;
                     validTargetSquares = [];
                 }
-                drawBoard();
+                drawBoard(); // Redraws board to show valid squares
             }
         }
 
         function updateStatus() {
+            if (useTimer && (timerWhite === 0 || timerBlack === 0)) return; 
+
             let statusHTML = '';
             let moveColor = game.turn() === 'w' ? 'White' : 'Black';
 
             if (game.in_checkmate()) {
                 statusHTML = `Game over, ${moveColor} is in checkmate.`;
                 document.getElementById('review-btn').style.display = "block"; 
+                document.getElementById('resign-btn').style.display = "none";
+                gameActive = false;
                 if(!gameSaved) {
                     gameSaved = true;
                     saveGameToHistory(game.turn() === 'w' ? 'Black Wins' : 'White Wins');
@@ -536,6 +1107,8 @@
             else if (game.in_draw()) {
                 statusHTML = 'Game over, drawn position.';
                 document.getElementById('review-btn').style.display = "block"; 
+                document.getElementById('resign-btn').style.display = "none";
+                gameActive = false;
                 if(!gameSaved) {
                     gameSaved = true;
                     saveGameToHistory('Draw');
@@ -545,6 +1118,14 @@
                 statusHTML = `${moveColor} to move`;
                 if (game.in_check()) statusHTML += ' (Check!)';
             }
+
+            // Real-time Opening Tracker for live matching sequence (Both Teams)
+            let currentMoves = gameNotationMoves.slice(1);
+            if (currentMoves.length > 0) {
+                let openingName = getOpeningName(currentMoves);
+                statusHTML += `<div style="color: #7289da; font-size: 14px; margin-top: 6px; font-weight: normal;">Opening: ${openingName}</div>`;
+            }
+
             statusEl.innerHTML = statusHTML;
         }
 
@@ -562,7 +1143,11 @@
                 result: resultText,
                 fens: [...gameFens],
                 evals: [...gameEvals],
-                moves: [...gameNotationMoves]
+                moves: [...gameNotationMoves],
+                lastMoves: [...gameLastMoves],
+                timesWhite: [...gameTimesWhite],
+                timesBlack: [...gameTimesBlack],
+                suggestedMoves: []
             };
 
             let history = JSON.parse(localStorage.getItem('html_chess_history')) || [];
@@ -583,15 +1168,15 @@
             }
 
             history.forEach((match, index) => {
-                if (match.result === 'White Wins') whiteWins++;
-                else if (match.result === 'Black Wins') blackWins++;
+                if (match.result.includes('White Wins')) whiteWins++;
+                else if (match.result.includes('Black Wins')) blackWins++;
                 else if (match.result === 'Draw') draws++;
 
                 const item = document.createElement('div');
                 item.className = 'history-item';
                 
-                if (match.result === 'White Wins') item.style.borderColor = '#43b581';
-                else if (match.result === 'Black Wins') item.style.borderColor = '#f2ca5c';
+                if (match.result.includes('White Wins')) item.style.borderColor = '#43b581';
+                else if (match.result.includes('Black Wins')) item.style.borderColor = '#f2ca5c';
                 else item.style.borderColor = '#7289da';
 
                 item.innerHTML = `
@@ -626,7 +1211,63 @@
             }
         }
 
-        /* --- REVIEW LOGIC --- */
+        /* --- PRE-CALCULATE MISTAKES LOGIC --- */
+        function prepareAnalysis(isFromHistory = false, historyIndex = -1) {
+            if (isAnalyzing || gameFens.length <= 1) return;
+            isAnalyzing = true;
+            gameActive = false;
+            clearInterval(timerInterval);
+            
+            document.getElementById('main-title').innerText = "Game Engine Working...";
+            document.getElementById('game-controls').style.display = "none";
+            document.getElementById('review-controls').style.display = "none";
+            historySectionEl.style.display = "none";
+            reviewPanelEl.style.display = "none";
+            
+            suggestedMoves = new Array(gameFens.length).fill(null);
+            let i = 1;
+
+            // Non-blocking async loop to find all mistakes and calculate best moves instantly
+            function analyzeNextMove() {
+                if (i >= gameFens.length) {
+                    isAnalyzing = false;
+                    
+                    // Save the processed data back into the game history so we don't need to recalculate
+                    let history = JSON.parse(localStorage.getItem('html_chess_history')) || [];
+                    if (isFromHistory && historyIndex !== -1 && history[historyIndex]) {
+                        history[historyIndex].suggestedMoves = suggestedMoves;
+                    } else if (gameSaved && history.length > 0) {
+                        history[0].suggestedMoves = suggestedMoves;
+                    }
+                    localStorage.setItem('html_chess_history', JSON.stringify(history));
+
+                    startReview();
+                    return;
+                }
+
+                let percent = Math.round((i / (gameFens.length - 1)) * 100);
+                statusEl.innerHTML = `Analyzing Game for Mistakes... ${percent}%`;
+
+                game.load(gameFens[i - 1]);
+                let turnBefore = game.turn();
+                
+                let evalBefore = gameEvals[i - 1];
+                let evalAfter = gameEvals[i];
+                let evalDiff = (turnBefore === 'w') ? (evalBefore - evalAfter) : (evalAfter - evalBefore);
+                let pawnDiff = evalDiff / 10;
+
+                // If the move was an inaccuracy, mistake, or blunder, figure out the best alternative
+                if (pawnDiff > 1.5) {
+                    suggestedMoves[i] = suggestBestMove(gameFens[i - 1]);
+                }
+
+                i++;
+                setTimeout(analyzeNextMove, 15); // Yield 15ms so the progress bar visually updates 
+            }
+            analyzeNextMove();
+        }
+
+        /* --- INSTANT REVIEW LOGIC --- */
         function reviewPastGame(index) {
             let history = JSON.parse(localStorage.getItem('html_chess_history')) || [];
             let match = history[index];
@@ -635,12 +1276,35 @@
             gameFens = match.fens;
             gameEvals = match.evals;
             gameNotationMoves = match.moves;
-            startReview();
+            gameLastMoves = match.lastMoves || new Array(gameFens.length).fill(null);
+            gameTimesWhite = match.timesWhite || new Array(gameFens.length).fill(0);
+            gameTimesBlack = match.timesBlack || new Array(gameFens.length).fill(0);
+            
+            useTimer = gameTimesWhite.length > 0 && gameTimesWhite[0] > 0;
+            if (useTimer) {
+                document.getElementById('top-clock').style.display = 'flex';
+                document.getElementById('bottom-clock').style.display = 'flex';
+            } else {
+                document.getElementById('top-clock').style.display = 'none';
+                document.getElementById('bottom-clock').style.display = 'none';
+            }
+
+            // If the game was already analyzed in the past, just load it instantly
+            if (match.suggestedMoves && match.suggestedMoves.length === gameFens.length) {
+                suggestedMoves = match.suggestedMoves;
+                startReview();
+            } else {
+                // Otherwise, calculate the mistakes right now before opening it
+                prepareAnalysis(true, index); 
+            }
         }
 
         function startReview() {
             isReviewMode = true;
+            gameActive = false;
+            clearInterval(timerInterval);
             reviewIndex = 0; 
+            
             document.getElementById('main-title').innerText = "Game Analysis";
             document.getElementById('game-controls').style.display = "none";
             document.getElementById('review-controls').style.display = "flex";
@@ -648,6 +1312,8 @@
             
             selectedSquare = null;
             validTargetSquares = [];
+            
+            updateClockUI();
             renderReviewState();
         }
 
@@ -664,21 +1330,36 @@
             
             document.getElementById('review-counter').innerText = `Move ${reviewIndex} of ${gameFens.length - 1}`;
 
+            let currentMoves = gameNotationMoves.slice(1, reviewIndex + 1);
+            let openingName = getOpeningName(currentMoves);
+            document.getElementById('opening-name').innerText = reviewIndex > 0 ? `Opening: ${openingName}` : "";
+
             if (reviewIndex === 0) {
                 reviewPanelEl.style.display = "block";
                 reviewActorEl.innerText = "Game Start";
-                reviewTextEl.textContent = "Starting Position";
+                reviewTextEl.innerHTML = "Starting Position";
                 reviewPanelEl.className = "review-panel";
-                statusEl.innerHTML = "Opening Position";
+                statusEl.innerHTML = `Opening Position<div style="color: #7289da; font-size: 14px; margin-top: 6px; font-weight: normal;">Opening: ${openingName}</div>`;
+                if (useTimer && gameTimesWhite && gameTimesWhite[reviewIndex] !== undefined) {
+                    let timeStr = `White: ${formatTime(gameTimesWhite[reviewIndex])} | Black: ${formatTime(gameTimesBlack[reviewIndex])}`;
+                    reviewTextEl.innerHTML += `<br><span style="font-size: 13px; color: #ffcc00; margin-top: 6px; display: inline-block;">⏱️ ${timeStr}</span>`;
+                }
+                updateClockUI();
                 return;
             }
 
-            let isWhiteJustMoved = (game.turn() === 'b'); 
+            // Figure out whose turn it was previously to properly assign the mistake to White or Black
+            game.load(gameFens[reviewIndex - 1]);
+            let turnBefore = game.turn();
+            
+            // Immediately restore the board state to the current move visually
+            game.load(gameFens[reviewIndex]);
+
             let evalBefore = gameEvals[reviewIndex - 1];
             let evalAfter = gameEvals[reviewIndex];
             let rawMovePlayed = gameNotationMoves[reviewIndex]; 
 
-            let evalDiff = isWhiteJustMoved ? (evalBefore - evalAfter) : (evalAfter - evalBefore);
+            let evalDiff = (turnBefore === 'w') ? (evalBefore - evalAfter) : (evalAfter - evalBefore);
             let pawnDiff = evalDiff / 10;
             let feedback = "", fClass = "";
             
@@ -689,10 +1370,105 @@
             else { feedback = "Blunder! ❌"; fClass = "blunder"; }
             
             reviewPanelEl.style.display = "block";
-            reviewActorEl.innerText = isWhiteJustMoved ? `White Played: ${rawMovePlayed}` : `Black Played: ${rawMovePlayed}`;
-            reviewTextEl.textContent = feedback;
+            reviewActorEl.innerText = turnBefore === 'w' ? `White Played: ${rawMovePlayed}` : `Black Played: ${rawMovePlayed}`;
             reviewPanelEl.className = `review-panel ${fClass}`;
-            statusEl.innerHTML = `Reviewing Move ${reviewIndex}`;
+            statusEl.innerHTML = `Reviewing Move ${reviewIndex}<div style="color: #7289da; font-size: 14px; margin-top: 6px; font-weight: normal;">Opening: ${openingName}</div>`;
+
+            // Because we pre-calculated the best moves after the game ended, we can load it instantly
+            if (pawnDiff > 1.5) {
+                let betterMove = suggestedMoves[reviewIndex] || "Unknown";
+                let moveDesc = "";
+
+                // --- ANIMATION & DESCRIPTION LOGIC ---
+                if (betterMove !== "Unknown" && betterMove !== "None") {
+                    try {
+                        // Temporarily load the board state *before* the mistake to parse the suggestion
+                        game.load(gameFens[reviewIndex - 1]);
+                        let parsedMove = game.move(betterMove);
+                        
+                        // Restore the visual board state immediately so the view isn't broken
+                        game.load(gameFens[reviewIndex]);
+                        
+                        if (parsedMove) {
+                            // Apply the pulsing animation class to the 'from' and 'to' squares
+                            let fromSquare = document.getElementById(parsedMove.from);
+                            let toSquare = document.getElementById(parsedMove.to);
+                            if (fromSquare) fromSquare.classList.add('suggested-highlight');
+                            if (toSquare) toSquare.classList.add('suggested-highlight');
+
+                            // Generate clean, readable English translations for algebraic codes
+                            const pieceNames = { 'p': 'Pawn', 'n': 'Knight', 'b': 'Bishop', 'r': 'Rook', 'q': 'Queen', 'k': 'King' };
+                            if (parsedMove.san === 'O-O') {
+                                moveDesc = "Kingside Castle";
+                            } else if (parsedMove.san === 'O-O-O') {
+                                moveDesc = "Queenside Castle";
+                            } else {
+                                let pName = pieceNames[parsedMove.piece] || "Piece";
+                                if (parsedMove.captured) {
+                                    let capName = pieceNames[parsedMove.captured] || "Piece";
+                                    moveDesc = `${pName} takes ${capName} on ${parsedMove.to}`;
+                                } else {
+                                    moveDesc = `${pName} to ${parsedMove.to}`;
+                                }
+                            }
+                        }
+                    } catch(e) {
+                        // Failsafe: if parse fails, just make sure the board state is restored
+                        game.load(gameFens[reviewIndex]); 
+                    }
+                }
+                // --- END ANIMATION LOGIC ---
+                
+                let descHTML = moveDesc ? `<br><span style="font-size: 13px; color: #ffcc00; font-weight: 500;">💡 ${moveDesc}</span>` : "";
+                reviewTextEl.innerHTML = feedback + `<br><span style="font-size: 14px; color: #b9bbbe;">Suggested Move: <strong style="color: #fff;">${betterMove}</strong></span>` + descHTML;
+                
+            } else {
+                reviewTextEl.innerHTML = feedback;
+            }
+
+            if (useTimer && gameTimesWhite && gameTimesWhite[reviewIndex] !== undefined) {
+                let timeStr = `White: ${formatTime(gameTimesWhite[reviewIndex])} | Black: ${formatTime(gameTimesBlack[reviewIndex])}`;
+                reviewTextEl.innerHTML += `<br><span style="font-size: 13px; color: #ffcc00; margin-top: 6px; display: inline-block;">⏱️ ${timeStr}</span>`;
+            }
+            updateClockUI();
+        }
+
+        /* --- BEST MOVE ENGINE (OPTIMIZED WITH ALPHA-BETA) --- */
+        function suggestBestMove(previousFen) {
+            let currentReviewFen = game.fen();
+            game.load(previousFen); 
+
+            let moves = game.moves();
+            if (moves.length === 0) {
+                game.load(currentReviewFen);
+                return "None";
+            }
+
+            moves.sort((a, b) => (b.includes('x') ? 1 : 0) - (a.includes('x') ? 1 : 0));
+
+            let bestMove = moves[0];
+            let isWhiteTurn = game.turn() === 'w';
+            let bestVal = isWhiteTurn ? -Infinity : Infinity;
+
+            let alpha = -Infinity;
+            let beta = Infinity;
+
+            for (let i = 0; i < moves.length; i++) {
+                game.move(moves[i]);
+                let val = minimax(1, alpha, beta, !isWhiteTurn); 
+                game.undo();
+
+                if (isWhiteTurn) {
+                    if (val > bestVal) { bestVal = val; bestMove = moves[i]; }
+                    alpha = Math.max(alpha, bestVal); 
+                } else {
+                    if (val < bestVal) { bestVal = val; bestMove = moves[i]; }
+                    beta = Math.min(beta, bestVal); 
+                }
+            }
+
+            game.load(currentReviewFen); 
+            return bestMove;
         }
 
         /* --- BOT AI LOGIC --- */
@@ -701,10 +1477,18 @@
             statusEl.innerHTML = "Bot is thinking...";
 
             const difficulty = document.getElementById('difficulty').value;
-            const thinkDelay = (difficulty === 'easy' || difficulty === 'normal') ? 1000 : 10;
+            
+            let thinkDelay = 1000;
+            if (difficulty === 'normal') thinkDelay = 1500;
+            if (difficulty === 'hard') thinkDelay = 2000;
+            if (difficulty === 'impossible') thinkDelay = 2500;
 
             setTimeout(() => {
+                if (game.game_over() || isReviewMode || isAnalyzing) return;
+                
                 const moves = game.moves(); 
+                if (moves.length === 0) return;
+
                 moves.sort((a, b) => (b.includes('x') ? 1 : 0) - (a.includes('x') ? 1 : 0));
                 let bestMove = null;
 
@@ -715,27 +1499,41 @@
                     if (difficulty === 'hard') depth = 2;
                     if (difficulty === 'impossible') depth = 3; 
 
-                    let bestVal = Infinity; 
+                    const isBotWhite = game.turn() === 'w';
+                    let bestVal = isBotWhite ? -Infinity : Infinity; 
                     
                     for (let i = 0; i < moves.length; i++) {
                         game.move(moves[i]);
-                        let boardVal = minimax(depth - 1, -Infinity, Infinity, true);
+                        
+                        let boardVal = minimax(depth - 1, -Infinity, Infinity, !isBotWhite);
                         game.undo();
-                        if (boardVal < bestVal) {
-                            bestVal = boardVal;
-                            bestMove = moves[i];
+                        
+                        if (isBotWhite) {
+                            if (boardVal > bestVal) {
+                                bestVal = boardVal;
+                                bestMove = moves[i];
+                            }
+                        } else {
+                            if (boardVal < bestVal) {
+                                bestVal = boardVal;
+                                bestMove = moves[i];
+                            }
                         }
                     }
                 }
+
+                if (useTimer && gameActive) updateTimeOnMove();
 
                 const botMoveResult = game.move(bestMove);
                 if (botMoveResult) {
                     recordMove(botMoveResult); 
                     handleGameSound(botMoveResult);
+                    if (useTimer && !gameActive) startTimer();
                 }
 
                 drawBoard();
                 updateStatus();
+                updateClockUI();
             }, thinkDelay);
         }
 
@@ -791,9 +1589,14 @@
             return piece.color === 'w' ? val : -val;
         }
 
-        gameFens.push(game.fen());
-        gameEvals.push(0);
-        gameNotationMoves.push("");
+        setupTimers();
+        lastMoveTimestamp = Date.now();
+        gameFens = [game.fen()];
+        gameEvals = [0];
+        gameNotationMoves = [""];
+        gameLastMoves = [null];
+        gameTimesWhite = [timerWhite];
+        gameTimesBlack = [timerBlack];
         drawBoard();
         updateHistoryUI();
     </script>
