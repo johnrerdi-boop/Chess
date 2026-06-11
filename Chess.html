@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lightning Fast HTML Chess</title>
+    <title>Lightning Fast HTML Chess - Ultimate Grandmaster Edition</title>
+    <!-- Chess logic and PeerJS for Online Multiplayer -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+    <script src="https://unpkg.com/peerjs@1.5.1/dist/peerjs.min.js"></script>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -20,7 +22,6 @@
         }
         h1 { margin-top: 0; margin-bottom: 25px; text-align: center; }
 
-        /* Side-By-Side Layout Architecture */
         .main-layout {
             display: flex;
             flex-direction: row;
@@ -46,7 +47,6 @@
             max-width: 320px;
         }
 
-        /* Timer UI */
         .clock-container {
             display: flex;
             justify-content: space-between;
@@ -80,7 +80,6 @@
         .active-clock .clock-label { color: #23272a; }
         .low-time { color: #f04747 !important; }
 
-        /* Right Sidebar Elements */
         .status-box {
             background: #1e2124;
             padding: 15px;
@@ -111,7 +110,7 @@
 
         label { font-size: 13px; color: #b9bbbe; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
         
-        select, button, input[type="number"] {
+        select, button, input[type="text"], input[type="number"] {
             padding: 10px;
             font-size: 15px;
             border-radius: 5px;
@@ -120,7 +119,9 @@
             width: 100%;
             box-sizing: border-box;
         }
-        select, input[type="number"] { background: #fff; color: #000; font-weight: bold; }
+        select, input[type="text"], input[type="number"] { background: #fff; color: #000; font-weight: bold; }
+        input[type="text"] { cursor: text; }
+        
         button { background: #7289da; color: #fff; font-weight: bold; transition: 0.2s; }
         button:hover { background: #5b6eae; }
         
@@ -128,6 +129,19 @@
         #review-btn:hover { background: #3ca374; }
         .nav-btn { background: #f04747; }
         .nav-btn:hover { background: #d84040; }
+
+        .btn-small { padding: 5px 8px; font-size: 12px; border-radius: 4px; background: #4f545c; width: auto; cursor: pointer;}
+        .btn-small:hover { background: #686d73; }
+
+        .online-panel {
+            background: #2c2f33;
+            padding: 12px;
+            border-radius: 5px;
+            border: 1px solid #7289da;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
 
         .checkbox-container {
             display: flex;
@@ -140,7 +154,6 @@
             margin: 5px 0;
         }
         
-        /* Board System Styling */
         .board-wrapper {
             display: grid;
             grid-template-columns: 30px 480px;
@@ -183,7 +196,7 @@
             width: 60px; height: 60px;
             display: flex; justify-content: center; align-items: center;
             font-size: 42px; cursor: pointer; position: relative; user-select: none;
-            transition: box-shadow 0.4s ease-out; /* Smooth fade effect for the outline */
+            transition: box-shadow 0.4s ease-out;
         }
         .light { background-color: #f0d9b5; }
         .dark { background-color: #b58863; }
@@ -196,17 +209,9 @@
             background-color: rgba(0, 0, 0, 0.2); border-radius: 50%; position: absolute;
         }
 
-        /* Distinctive outlines for player moves */
-        .last-move-white {
-            box-shadow: inset 0 0 0 4px #ffffff !important;
-            z-index: 5;
-        }
-        .last-move-black {
-            box-shadow: inset 0 0 0 4px #000000 !important;
-            z-index: 5;
-        }
+        .last-move-white { box-shadow: inset 0 0 0 4px #ffffff !important; z-index: 5; }
+        .last-move-black { box-shadow: inset 0 0 0 4px #000000 !important; z-index: 5; }
 
-        /* Review & History Panels */
         .review-panel { 
             padding: 15px; 
             border-radius: 5px; 
@@ -223,12 +228,7 @@
         .mistake { color: #e58f2a; border-color: #e58f2a; }
         .blunder { color: #ca3431; border-color: #ca3431; }
 
-        /* Animation for suggested moves */
-        .suggested-highlight {
-            animation: pulse-suggest 1.5s infinite;
-            z-index: 10;
-        }
-
+        .suggested-highlight { animation: pulse-suggest 1.5s infinite; z-index: 10; }
         @keyframes pulse-suggest {
             0% { box-shadow: inset 0 0 0 4px rgba(49, 161, 77, 0.8); background-color: rgba(49, 161, 77, 0.4); }
             50% { box-shadow: inset 0 0 0 6px rgba(49, 161, 77, 1); background-color: rgba(49, 161, 77, 0.7); }
@@ -244,37 +244,13 @@
             flex-direction: column;
         }
         .stats-container {
-            display: flex;
-            justify-content: space-around;
-            background: #1e2124;
-            padding: 10px;
-            border-radius: 5px;
-            margin-bottom: 12px;
-            font-weight: bold;
-            font-size: 13px;
+            display: flex; justify-content: space-around; background: #1e2124;
+            padding: 10px; border-radius: 5px; margin-bottom: 12px; font-weight: bold; font-size: 13px;
         }
-        .history-list {
-            max-height: 180px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            padding-right: 5px;
-        }
-        .history-item {
-            background: #2c2f33;
-            padding: 10px;
-            border-radius: 5px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 13px;
-            border-left: 4px solid #7289da;
-        }
+        .history-list { max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 5px; }
+        .history-item { background: #2c2f33; padding: 10px; border-radius: 5px; display: flex; justify-content: space-between; align-items: center; font-size: 13px; border-left: 4px solid #7289da; }
         .history-item-details { display: flex; flex-direction: column; gap: 2px; }
         .history-actions { display: flex; gap: 5px; }
-        .btn-small { padding: 5px 8px; font-size: 12px; border-radius: 4px; background: #4f545c; width: auto; }
-        .btn-small:hover { background: #686d73; }
         .btn-delete { background: #f04747; }
         .btn-delete:hover { background: #d84040; }
         
@@ -286,7 +262,7 @@
 </head>
 <body>
 
-    <h1 id="main-title">Standard Chess (Ultra Fast Engine)</h1>
+    <h1 id="main-title">Standard Chess (Tactical Grandmaster Engine)</h1>
     
     <div class="main-layout">
         
@@ -315,6 +291,48 @@
             <div class="controls" id="game-controls">
                 
                 <div class="control-group">
+                    <label for="mode">Game Mode</label>
+                    <select id="mode" onchange="playUiSound(); toggleGameMode()">
+                        <option value="friend">Local Friend (Same Screen)</option>
+                        <option value="bot" selected>Play with Bot</option>
+                        <option value="online">Play Online (P2P WiFi)</option>
+                    </select>
+                </div>
+
+                <div class="online-panel" id="online-container" style="display:none;">
+                    <label style="color: #ffcc00; margin-bottom: 5px;">Online Connection</label>
+                    <div style="font-size: 13px; color: #b9bbbe; display:flex; justify-content: space-between; align-items: center;">
+                        <span>Your ID: <span id="my-peer-id" style="color:#fff;font-weight:bold;">Loading...</span></span>
+                        <button onclick="copyPeerId()" class="btn-small" style="margin: 0;">Copy</button>
+                    </div>
+                    <input type="text" id="friend-id-input" placeholder="Paste Friend's ID here">
+                    <button onclick="playUiSound(); connectToFriend()" style="background: #43b581;">Send Duel Request</button>
+                    
+                    <!-- Duel Request Popup Context -->
+                    <div id="duel-request-panel" style="display: none; background: #1e2124; padding: 12px; border-radius: 6px; border: 2px dashed #f2ca5c; margin-top: 10px; text-align: center;">
+                        <span style="font-size: 13px; color: #fff; display: block; margin-bottom: 8px;">
+                            Duel Request From: <br><strong id="incoming-peer-id" style="color: #ffcc00; font-size: 11px; word-break: break-all;"></strong>
+                        </span>
+                        <div style="display: flex; gap: 8px;">
+                            <button onclick="acceptDuel()" style="background: #43b581; padding: 6px; font-size: 13px;">Accept</button>
+                            <button onclick="declineDuel()" style="background: #f04747; padding: 6px; font-size: 13px;">Decline</button>
+                        </div>
+                    </div>
+
+                    <div id="online-status" style="color: #f2ca5c; font-size: 13px; text-align: center; font-weight: bold; margin-top: 5px;">Not connected</div>
+                </div>
+
+                <div class="control-group" id="diff-container">
+                    <label for="difficulty">Bot Difficulty</label>
+                    <select id="difficulty" onchange="playUiSound(); resetGame()">
+                        <option value="easy">Easy</option>
+                        <option value="normal" selected>Normal</option>
+                        <option value="hard">Hard</option>
+                        <option value="impossible">Impossible (Tactical Lookahead)</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
                     <label for="time-control">Time Control</label>
                     <select id="time-control" onchange="playUiSound(); toggleCustomTime(); resetGame()">
                         <option value="0">No Timer (Casual)</option>
@@ -332,28 +350,11 @@
                 </div>
 
                 <div class="control-group">
-                    <label for="mode">Game Mode</label>
-                    <select id="mode" onchange="playUiSound(); toggleGameMode()">
-                        <option value="friend">Play with Friend (Local)</option>
-                        <option value="bot" selected>Play with Bot</option>
-                    </select>
-                </div>
-
-                <div class="control-group" id="diff-container">
-                    <label for="difficulty">Bot Difficulty</label>
-                    <select id="difficulty" onchange="playUiSound(); resetGame()">
-                        <option value="easy">Easy</option>
-                        <option value="normal" selected>Normal</option>
-                        <option value="hard">Hard</option>
-                        <option value="impossible">Impossible</option>
-                    </select>
-                </div>
-
-                <div class="control-group">
-                    <label for="player-color">Play Perspective</label>
+                    <label for="player-color">Choose Color</label>
                     <select id="player-color" onchange="playUiSound(); resetGame()">
-                        <option value="w">Play as White</option>
-                        <option value="b">Play as Black</option>
+                        <option value="w">White</option>
+                        <option value="b">Black</option>
+                        <option value="random">Random (Luck)</option>
                     </select>
                 </div>
 
@@ -361,7 +362,7 @@
                     <input type="checkbox" id="soundToggle" checked onchange="playUiSound()"> Enable Sounds
                 </label>
 
-                <button onclick="playUiSound(); resetGame()">Restart Game</button>
+                <button id="restart-btn" onclick="playUiSound(); resetGame()">Restart Game</button>
                 <button id="resign-btn" onclick="playUiSound(); resignGame()" style="background: #f04747; display: none;">Resign Game</button>
                 <button id="review-btn" onclick="playUiSound(); prepareAnalysis()">Analyze Game</button>
             </div>
@@ -412,270 +413,57 @@
         let gameLastMoves = [];
         let gameTimesWhite = [];
         let gameTimesBlack = [];
-        let suggestedMoves = []; // Stores our pre-calculated best moves
+        let suggestedMoves = [];
         
         let isReviewMode = false;
         let isAnalyzing = false;
         let reviewIndex = 0;
         let gameSaved = false;
-        let lastMoveTimestamp = 0; // Tracks when a move was made for the 1s outline
+        let lastMoveTimestamp = 0;
 
-        /* Precision Tracking Timer Variables */
         let timerWhite = 0; 
         let timerBlack = 0; 
         let lastUpdateTime = 0; 
         let useTimer = false;
         let timerInterval = null;
         let gameActive = false;
+        
+        let playingColor = 'w'; 
+
+        // PeerJS Online Multiplayer Variables
+        let peer = null;
+        let onlineConn = null;
+        let isOnlineHost = false;
 
         const piecesMap = { 'p': '♟', 'n': '♞', 'b': '♝', 'r': '♜', 'q': '♛', 'k': '♚' };
 
-        const SQUARES = [
-            'a8', 'b8', 'c8', 'd8', 'e8', 'f8', 'g8', 'h8',
-            'a7', 'b7', 'c7', 'd7', 'e7', 'f7', 'g7', 'h7',
-            'a6', 'b6', 'c6', 'd6', 'e6', 'f6', 'g6', 'h6',
-            'a5', 'b5', 'c5', 'd5', 'e5', 'f5', 'g5', 'h5',
-            'a4', 'b4', 'c4', 'd4', 'e4', 'f4', 'g4', 'h4',
-            'a3', 'b3', 'c3', 'd3', 'e3', 'f3', 'g3', 'h3',
-            'a2', 'b2', 'c2', 'd2', 'e2', 'f2', 'g2', 'h2',
-            'a1', 'b1', 'c1', 'd1', 'e1', 'f1', 'g1', 'h1'
-        ];
-
-        /* --- CHESS OPENINGS DICTIONARY --- */
         const chessOpenings = {
-            // Open Games (1.e4 e5)
             "e4": "King's Pawn Game",
             "e4 e5": "Open Game",
             "e4 e5 Nf3": "King's Knight Opening",
-            "e4 e5 Nf3 Nc6": "Open Game: Normal Variation",
+            "e4 e5 Nf3 Nc6": "Open Game: Normal Line",
             "e4 e5 Nf3 Nc6 Bb5": "Ruy Lopez",
-            "e4 e5 Nf3 Nc6 Bb5 a6": "Ruy Lopez: Morphy Defense",
-            "e4 e5 Nf3 Nc6 Bb5 a6 Ba4": "Ruy Lopez: Morphy Defense, Deferred",
-            "e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6": "Ruy Lopez: Morphy Defense, Main Line",
-            "e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O": "Ruy Lopez: Morphy Defense, Castled",
-            "e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O Be7": "Ruy Lopez: Closed Defense",
-            "e4 e5 Nf3 Nc6 Bb5 Nf6": "Ruy Lopez: Berlin Defense",
-            "e4 e5 Nf3 Nc6 Bb5 f5": "Ruy Lopez: Schliemann Defense",
-            "e4 e5 Nf3 Nc6 Bb5 Bc5": "Ruy Lopez: Classical Defense",
-            "e4 e5 Nf3 Nc6 Bb5 g6": "Ruy Lopez: Smyslov Defense",
-            "e4 e5 Nf3 Nc6 Bb5 Nd4": "Ruy Lopez: Bird Defense",
-            "e4 e5 Nf3 Nc6 Bb5 d6": "Ruy Lopez: Steinitz Defense",
             "e4 e5 Nf3 Nc6 Bc4": "Italian Game",
-            "e4 e5 Nf3 Nc6 Bc4 Bc5": "Giuoco Piano",
-            "e4 e5 Nf3 Nc6 Bc4 Bc5 c3": "Giuoco Piano: Center Attack",
-            "e4 e5 Nf3 Nc6 Bc4 Bc5 b4": "Evans Gambit",
-            "e4 e5 Nf3 Nc6 Bc4 Nf6": "Two Knights Defense",
-            "e4 e5 Nf3 Nc6 Bc4 Nf6 Ng5": "Two Knights Defense: Fried Liver / Knight Attack",
-            "e4 e5 Nf3 Nc6 Bc4 Nf6 d4": "Two Knights Defense: Modern Variation",
-            "e4 e5 Nf3 Nc6 d4": "Scotch Game",
-            "e4 e5 Nf3 Nc6 d4 exd4": "Scotch Game: Main Line",
-            "e4 e5 Nf3 Nc6 d4 exd4 Nxd4": "Scotch Game: Classical Variation",
-            "e4 e5 Nf3 Nc6 d4 exd4 c3": "Goring Gambit",
-            "e4 e5 Nf3 Nc6 Nc3": "Three Knights Game",
-            "e4 e5 Nf3 Nc6 Nc3 Nf6": "Four Knights Game",
-            "e4 e5 Nf3 Nc6 Nc3 Nf6 Bb5": "Four Knights: Spanish Variation",
-            "e4 e5 Nf3 Nc6 Nc3 Nf6 Bc4": "Four Knights: Italian Variation",
-            "e4 e5 Nf3 d6": "Philidor Defense",
-            "e4 e5 Nf3 Nf6": "Petrov's Defense",
-            "e4 e5 Nf3 Nf6 Nxe5": "Petrov's Defense: Classical Line",
-            "e4 e5 Nf3 Nf6 Nxe5 d6 Nf3 Nxe4 d4": "Petrov's Defense: Modern Attack",
-            "e4 e5 Nf3 f5": "Latvian Gambit",
-            "e4 e5 Nf3 d5": "Elephant Gambit",
-            "e4 e5 f4": "King's Gambit",
-            "e4 e5 f4 exd4": "King's Gambit Accepted",
-            "e4 e5 f4 exd4 Nf3": "King's Gambit Accepted: King's Knight Gambit",
-            "e4 e5 f4 exd4 Bc4": "King's Gambit Accepted: Bishop's Gambit",
-            "e4 e5 f4 d5": "King's Gambit: Falkbeer Countergambit",
-            "e4 e5 Nc3": "Vienna Game",
-            "e4 e5 Nc3 Nf6": "Vienna Game: Falkbeer Variation",
-            "e4 e5 Nc3 Nc6": "Vienna Game: Max Lange Defense",
-            "e4 e5 Nc3 Nf6 f4": "Vienna Gambit",
-            "e4 e5 d4": "Center Game",
-            "e4 e5 d4 exd4 Qxd4": "Center Game: Main Line",
-            "e4 e5 d4 exd4 c3": "Danish Gambit",
-            "e4 e5 Nf3 f6": "Damiano Defense",
-            "e4 e5 Qh5": "Danvers Opening (Scholar's Mate)",
-
-            // Semi-Open Games (1.e4 other)
             "e4 c5": "Sicilian Defense",
-            "e4 c5 Nf3": "Sicilian Defense: Open Opening",
-            "e4 c5 Nf3 d6": "Sicilian: Traditional Setup",
-            "e4 c5 Nf3 d6 d4": "Sicilian Defense: Open",
-            "e4 c5 Nf3 d6 d4 cxd4": "Sicilian: Open Main Line",
-            "e4 c5 Nf3 d6 d4 cxd4 Nxd4": "Sicilian: Open Main Line",
-            "e4 c5 Nf3 d6 d4 Nxd4 Nf6": "Sicilian: Open, Two Knights",
-            "e4 c5 Nf3 d6 d4 Nxd4 Nf6 Nc3": "Sicilian: Classical Open",
-            "e4 c5 Nf3 d6 d4 Nxd4 Nf6 Nc3 a6": "Sicilian: Najdorf Variation",
-            "e4 c5 Nf3 d6 d4 Nxd4 Nf6 Nc3 g6": "Sicilian: Dragon Variation",
-            "e4 c5 Nf3 d6 d4 Nxd4 Nf6 Nc3 Nc6": "Sicilian: Classical Variation",
-            "e4 c5 Nf3 Nc6": "Sicilian Defense: Old Sicilian",
-            "e4 c5 Nf3 Nc6 d4": "Sicilian Defense: Open with Nc6",
-            "e4 c5 Nf3 Nc6 d4 cxd4": "Sicilian: Open with Nc6",
-            "e4 c5 Nf3 Nc6 d4 Nxd4": "Sicilian: Open with Nc6",
-            "e4 c5 Nf3 Nc6 d4 Nxd4 g6": "Sicilian: Accelerated Dragon",
-            "e4 c5 Nf3 Nc6 Bb5": "Sicilian: Rossolimo Attack",
-            "e4 c5 Nf3 e6": "Sicilian: French Variation",
-            "e4 c5 Nf3 e6 d4": "Sicilian: Open French Line",
-            "e4 c5 Nf3 e6 d4 cxd4": "Sicilian: Open French Line",
-            "e4 c5 Nf3 e6 d4 Nxd4": "Sicilian: Taimanov/Kan Setup",
-            "e4 c5 Nf3 e6 d4 Nxd4 Nc6": "Sicilian: Taimanov Variation",
-            "e4 c5 Nf3 e6 d4 Nxd4 a6": "Sicilian: Kan Variation",
-            "e4 c5 c3": "Sicilian: Alapin Variation (Anti-Sicilian)",
-            "e4 c5 Nc3": "Closed Sicilian",
-            "e4 c5 Nc3 Nc6": "Closed Sicilian Setup",
-            "e4 c5 Nc3 Nc6 g3 g6 Bg2 Bg7 d3 d6": "Closed Sicilian: Main Line",
-            "e4 c5 f4": "Sicilian: Grand Prix Attack",
-            "e4 c5 d4": "Sicilian: Smith-Morra Gambit",
-            "e4 c5 d4 cxd4 c3": "Sicilian: Smith-Morra Gambit Accepted",
-            "e4 c5 b4": "Sicilian: Wing Gambit",
-
             "e4 e6": "French Defense",
-            "e4 e6 d4": "French Defense: Normal",
-            "e4 e6 d4 d5": "French Defense: Main Line",
-            "e4 e6 d4 d5 e5": "French Defense: Advance Variation",
-            "e4 e6 d4 d5 Nc3": "French Defense: Paulsen",
-            "e4 e6 d4 d5 Nc3 Nf6": "French Defense: Classical Variation",
-            "e4 e6 d4 d5 Nc3 Bb4": "French Defense: Winawer Variation",
-            "e4 e6 d4 d5 Nd2": "French Defense: Tarrasch Variation",
-            "e4 e6 d4 d5 exd5": "French Defense: Exchange Variation",
-            "e4 e6 d3": "French: King's Indian Attack",
-
             "e4 c6": "Caro-Kann Defense",
-            "e4 c6 d4": "Caro-Kann: Normal",
-            "e4 c6 d4 d5": "Caro-Kann Defense: Main Line",
-            "e4 c6 d4 d5 e5": "Caro-Kann Defense: Advance Variation",
-            "e4 c6 d4 d5 Nc3": "Caro-Kann Defense: Classical",
-            "e4 c6 d4 d5 Nc3 dxe4": "Caro-Kann: Classical Variation",
-            "e4 c6 d4 d5 Nc3 dxe4 Nxe4 Bf5": "Caro-Kann: Classical, Classical Line",
-            "e4 c6 d4 d5 Nc3 dxe4 Nxe4 Nf6": "Caro-Kann: Tartakower/Deves Variation",
-            "e4 c6 d4 d5 exd5": "Caro-Kann Defense: Exchange Variation",
-            "e4 c6 d4 d5 exd5 cxd5 c4": "Caro-Kann: Panov-Botvinnik Attack",
-            "e4 c6 c4": "Caro-Kann: Accelerated Panov",
-
-            "e4 d5": "Scandinavian Defense",
-            "e4 d5 exd5": "Scandinavian Defense: Exchange",
-            "e4 d5 exd5 Qxd5": "Scandinavian Defense: Main Line",
-            "e4 d5 exd5 Qxd5 Nc3": "Scandinavian Defense: Main Line with Nc3",
-            "e4 d5 exd5 Qxd5 Nc3 Qa5": "Scandinavian: Classical Variation",
-            "e4 d5 exd5 Nf6": "Scandinavian Defense: Modern Variation",
-
-            "e4 d6": "Pirc Defense",
-            "e4 d6 d4": "Pirc Defense: Standard",
-            "e4 d6 d4 Nf6": "Pirc Defense: Main Line",
-            "e4 d6 d4 Nf6 Nc3": "Pirc Defense: Main Setup",
-            "e4 d6 d4 Nf6 Nc3 g6": "Pirc Defense: Main Line",
-            "e4 d6 d4 Nf6 Nc3 g6 f4": "Pirc Defense: Austrian Attack",
-
-            "e4 g6": "Modern Defense",
-            "e4 g6 d4 Bg7": "Modern Defense: Standard",
-            "e4 Nf6": "Alekhine's Defense",
-            "e4 Nf6 e5 Nd5": "Alekhine's Defense: Main Line",
-            "e4 Nf6 e5 Nd5 d4 d6 c4 Nb6 f4": "Alekhine: Four Pawns Attack",
-            "e4 Nf6 e5 Nd5 d4 d6 Nf3": "Alekhine: Modern Variation",
-            "e4 Nc6": "Nimzowitsch Defense",
-
-            // Closed Games (1.d4 d5)
             "d4": "Queen's Pawn Game",
-            "d4 d5": "Closed Game",
             "d4 d5 c4": "Queen's Gambit",
-            "d4 d5 c4 dxc4": "Queen's Gambit Accepted",
-            "d4 d5 c4 dxc4 Nf3": "Queen's Gambit Accepted: Central Line",
-            "d4 d5 c4 e6": "Queen's Gambit Declined",
-            "d4 d5 c4 e6 Nc3": "Queen's Gambit Declined: Traditional",
-            "d4 d5 c4 e6 Nc3 Nf6": "Queen's Gambit Declined: Main Line",
-            "d4 d5 c4 e6 Nc3 Nf6 Nf3": "Queen's Gambit Declined: Three Knights",
-            "d4 d5 c4 e6 Nc3 Nf6 Bg5": "Queen's Gambit Declined: Classical",
-            "d4 d5 c4 e6 Nf3 Nf6": "Queen's Gambit Declined: Neo-Orthodox",
-            "d4 d5 c4 c6": "Slav Defense",
-            "d4 d5 c4 c6 Nf3 Nf6 Nc3 dxc4": "Slav Defense: Czech Variation",
-            "d4 d5 c4 c6 Nc3 Nf6 e3": "Semi-Slav Defense",
-            "d4 d5 c4 c6 Nf3 Nf6 Nc3 e3": "Semi-Slav Defense: Main Line",
-            "d4 d5 c4 e5": "Albin Countergambit",
-            "d4 d5 c4 Nc6": "Chigorin Defense",
-            "d4 d5 Nf3": "Queen's Pawn Game: Symmetric",
-            "d4 d5 Nf3 Nf6": "Queen's Pawn Game: Symmetrical Variation",
-            "d4 d5 Nf3 Nf6 Bf4": "London System",
-            "d4 d5 e3": "Stonewall Attack",
-            "d4 d5 e4": "Blackmar-Diemer Gambit",
-
-            // Indian Defenses (1.d4 Nf6)
             "d4 Nf6": "Indian Defense",
-            "d4 Nf6 c4": "Indian Defense: Normal",
-            "d4 Nf6 c4 e6": "Indian Defense: East Indian Setup",
-            "d4 Nf6 c4 e6 Nc3": "Indian Defense: Neo-Classical",
-            "d4 Nf6 c4 e6 Nc3 Bb4": "Nimzo-Indian Defense",
-            "d4 Nf6 c4 e6 Nf3": "Indian Defense: Classical Variation",
-            "d4 Nf6 c4 e6 Nf3 b6": "Queen's Indian Defense",
-            "d4 Nf6 c4 e6 Nf3 d5": "Queen's Gambit Declined: Transposition",
-            "d4 Nf6 c4 e6 g3": "Catalan Opening",
-            "d4 Nf6 c4 e6 g3 d5": "Catalan Opening: Closed",
-            "d4 Nf6 c4 g6": "King's Indian Setup",
-            "d4 Nf6 c4 g6 Nc3": "King's Indian / Grünfeld Setup",
-            "d4 Nf6 c4 g6 Nc3 Bg7": "King's Indian Defense",
-            "d4 Nf6 c4 g6 Nc3 Bg7 e4 d6": "King's Indian Defense: Main Line",
-            "d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 Nf3": "King's Indian Defense: Classical Variation",
-            "d4 Nf6 c4 g6 Nc3 d5": "Grünfeld Defense",
-            "d4 Nf6 c4 g6 Nc3 d5 Nf3 Bg7": "Grünfeld Defense: Three Knights",
-            "d4 Nf6 c4 c5": "Benoni Defense",
-            "d4 Nf6 c4 c5 d5": "Modern Benoni",
-            "d4 Nf6 c4 c5 d5 b5": "Benko Gambit",
-            "d4 Nf6 c4 e5": "Budapest Gambit",
-
-            // Other Queen's Pawn Openings
-            "d4 f5": "Dutch Defense",
-            "d4 f5 g3": "Dutch Defense: Fianchetto",
-            "d4 f5 e4": "Dutch Defense: Staunton Gambit",
-            "d4 d6": "Wade Defense",
-
-            // Flank Openings
             "c4": "English Opening",
-            "c4 e5": "English Opening: King's English",
-            "c4 e5 Nc3": "English Opening: King's English, Reverse Sicilian",
-            "c4 c5": "English Opening: Symmetrical Variation",
-            "c4 c5 Nf3 Nf6 Nc3 Nc6": "English Opening: Symmetrical, Four Knights",
-            "c4 Nf6": "English Opening: Anglo-Indian Defence",
-            "c4 e6": "English Opening: Agincourt Defence",
-            "c4 c6": "English Opening: Caro-Kann Defensive System",
-
-            "Nf3": "Zukertort Opening / Réti Opening",
-            "Nf3 d5": "Réti Opening: Main Line",
-            "Nf3 d5 c4": "Réti Opening",
-            "Nf3 d5 c4 d4": "Réti Opening: Advance Variation",
-            "Nf3 Nf6": "Zukertort: Symmetrical",
-            "Nf3 c5": "Zukertort: Sicilian Invitation",
-
-            "b3": "Larsen's Opening",
-            "b3 d5": "Larsen's Opening: Classical Variation",
-            "f4": "Bird's Opening",
-            "f4 d5": "Bird's Opening: Dutch Variation",
-            "g3": "King's Fianchetto Opening (Benko's Opening)",
-            "b4": "Sokolsky Opening (Polish / Orangutan)",
-            "g4": "Grob Attack",
-            "Nc3": "Dunst Opening",
-            "a3": "Anderssen's Opening",
-            "d3": "Mieses Opening",
-            "e3": "Van 't Kruijs Opening",
-            "h3": "Clemenz Opening",
-            "a4": "Ware Opening",
-            "h4": "Kadas Opening",
-            "Nh3": "Amar Opening",
-            "Na3": "Durkin Opening",
-            "f3": "Gedult's Opening / Barnes Opening"
+            "Nf3": "Zukertort / Réti Opening"
         };
 
         function getOpeningName(moves) {
             let currentSequence = "";
-            let bestMatch = "Standard Opening";
-            for (let i = 0; i < moves.length && i < 10; i++) {
+            let bestMatch = "Standard Development";
+            for (let i = 0; i < moves.length && i < 12; i++) {
                 currentSequence += (currentSequence ? " " : "") + moves[i];
-                if (chessOpenings[currentSequence]) {
-                    bestMatch = chessOpenings[currentSequence];
-                }
+                if (chessOpenings[currentSequence]) bestMatch = chessOpenings[currentSequence];
             }
             return bestMatch;
         }
 
-        /* --- SOUND ENGINE --- */
         let audioCtx = null;
         function initAudio() {
             if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -685,7 +473,6 @@
         function playSound(type) {
             if (!document.getElementById('soundToggle').checked) return;
             initAudio();
-
             const osc = audioCtx.createOscillator();
             const gainNode = audioCtx.createGain();
             osc.connect(gainNode);
@@ -723,7 +510,183 @@
             else playSound('move');
         }
 
-        /* --- TIMER LOGIC --- */
+        // ==========================================
+        // ONLINE MULTIPLAYER PEERJS LOGIC (FIXED)
+        // ==========================================
+        
+        function initPeerJS() {
+            peer = new Peer();
+            peer.on('open', id => {
+                document.getElementById('my-peer-id').innerText = id;
+            });
+            peer.on('connection', conn => {
+                onlineConn = conn;
+                isOnlineHost = true;
+                setupOnlineConnection(true);
+            });
+        }
+
+        function copyPeerId() {
+            playUiSound();
+            const idText = document.getElementById('my-peer-id').innerText;
+            if (idText !== "Loading...") {
+                navigator.clipboard.writeText(idText);
+                alert("Your Online ID has been copied to your clipboard. Send it to your friend!");
+            }
+        }
+
+        function connectToFriend() {
+            const id = document.getElementById('friend-id-input').value.trim();
+            if (!id) return;
+            document.getElementById('online-status').innerText = "Sending Duel Request...";
+            document.getElementById('online-status').style.color = "#f2ca5c";
+            
+            onlineConn = peer.connect(id);
+            isOnlineHost = false;
+            setupOnlineConnection(false);
+        }
+
+        function setupOnlineConnection(isHost) {
+            onlineConn.on('open', () => {
+                if (isHost) {
+                    // Display Accept/Decline Dialog instead of immediate game start
+                    document.getElementById('online-status').innerText = "Duel request received!";
+                    document.getElementById('online-status').style.color = "#f2ca5c";
+                    document.getElementById('incoming-peer-id').innerText = onlineConn.peer;
+                    document.getElementById('duel-request-panel').style.display = "block";
+                } else {
+                    document.getElementById('online-status').innerText = "Duel request sent! Waiting for response...";
+                    document.getElementById('online-status').style.color = "#f2ca5c";
+                }
+            });
+
+            onlineConn.on('data', data => {
+                if (data.type === 'decline') {
+                    document.getElementById('online-status').innerText = "Duel request declined by opponent.";
+                    document.getElementById('online-status').style.color = "#f04747";
+                    onlineConn = null;
+                }
+                else if (data.type === 'start') {
+                    playingColor = data.hostColor === 'w' ? 'b' : 'w';
+                    
+                    document.getElementById('time-control').value = data.timeControl;
+                    if (data.timeControl === 'custom') {
+                        document.getElementById('custom-hours').value = data.cH;
+                        document.getElementById('custom-minutes').value = data.cM;
+                        document.getElementById('custom-seconds').value = data.cS;
+                    }
+                    toggleCustomTime();
+                    
+                    // Activate game engine parameters
+                    gameActive = true;
+                    resetGame();
+                    
+                    document.getElementById('online-status').innerText = "Duel accepted! Match in progress.";
+                    document.getElementById('online-status').style.color = "#43b581";
+                } 
+                else if (data.type === 'move') {
+                    if (useTimer && gameActive) updateTimeOnMove();
+                    const moveResult = game.move(data.move);
+                    if (moveResult) {
+                        recordMove(moveResult);
+                        handleGameSound(moveResult);
+                        if (useTimer && !timerInterval) startTimer();
+                    }
+                    drawBoard();
+                    updateStatus();
+                    updateClockUI();
+                }
+                else if (data.type === 'resign') {
+                    handleOpponentResign();
+                }
+            });
+
+            onlineConn.on('close', () => {
+                document.getElementById('online-status').innerText = "Disconnected from opponent.";
+                document.getElementById('online-status').style.color = "#f04747";
+                document.getElementById('duel-request-panel').style.display = "none";
+                document.getElementById('resign-btn').style.display = "none";
+                onlineConn = null;
+                gameActive = false;
+            });
+        }
+
+        function acceptDuel() {
+            playUiSound();
+            if (!onlineConn) return;
+
+            document.getElementById('duel-request-panel').style.display = "none";
+            document.getElementById('online-status').innerText = "Connected! Match Synchronized.";
+            document.getElementById('online-status').style.color = "#43b581";
+
+            let selColor = document.getElementById('player-color').value;
+            if (selColor === 'random') {
+                selColor = Math.random() < 0.5 ? 'w' : 'b';
+            }
+            playingColor = selColor;
+            
+            // Send match details to guest side
+            onlineConn.send({
+                type: 'start',
+                hostColor: playingColor,
+                timeControl: document.getElementById('time-control').value,
+                cH: document.getElementById('custom-hours').value,
+                cM: document.getElementById('custom-minutes').value,
+                cS: document.getElementById('custom-seconds').value
+            });
+
+            gameActive = true;
+            resetGame();
+        }
+
+        function declineDuel() {
+            playUiSound();
+            if (onlineConn) {
+                onlineConn.send({ type: 'decline' });
+                onlineConn.close();
+            }
+            document.getElementById('duel-request-panel').style.display = "none";
+            document.getElementById('online-status').innerText = "Request declined.";
+            document.getElementById('online-status').style.color = "#f04747";
+        }
+
+        function handleOpponentResign() {
+            if (game.game_over() || isReviewMode || isAnalyzing || !gameActive) return;
+            gameActive = false;
+            clearInterval(timerInterval);
+            timerInterval = null;
+            playSound('end');
+            
+            let winnerColorStr = playingColor === 'w' ? 'White' : 'Black';
+            let loserColorStr = playingColor === 'w' ? 'Black' : 'White';
+            
+            statusEl.innerHTML = `Game over, opponent (${loserColorStr}) resigned. You win!`;
+            document.getElementById('resign-btn').style.display = "none";
+            document.getElementById('review-btn').style.display = "block"; 
+            
+            if (!gameSaved) {
+                gameSaved = true;
+                saveGameToHistory(`${winnerColorStr} Wins (Opponent Resigned)`);
+            }
+            updateClockUI();
+        }
+
+        // ==========================================
+        // GAME LOGIC & UI (FIXED)
+        // ==========================================
+
+        function toggleGameMode() {
+            const mode = document.getElementById('mode').value;
+            document.getElementById('diff-container').style.display = (mode === 'bot') ? 'flex' : 'none';
+            document.getElementById('online-container').style.display = (mode === 'online') ? 'flex' : 'none';
+            
+            if (mode === 'online' && !peer) {
+                initPeerJS();
+            }
+            gameActive = (mode !== 'online'); // Delay active loop for online modes until handshake completes
+            resetGame();
+        }
+
         function toggleCustomTime() {
             const val = document.getElementById('time-control').value;
             document.getElementById('custom-time-container').style.display = (val === 'custom') ? 'flex' : 'none';
@@ -744,6 +707,7 @@
 
         function setupTimers() {
             clearInterval(timerInterval);
+            timerInterval = null;
             const val = document.getElementById('time-control').value;
             let totalMs = 0;
             
@@ -757,8 +721,6 @@
                 const m = parseInt(document.getElementById('custom-minutes').value) || 0;
                 const s = parseInt(document.getElementById('custom-seconds').value) || 0;
                 totalMs = (h * 3600 + m * 60 + s) * 1000;
-                
-                // Prevent setting 0 time if custom is selected; default to 1 min
                 if (totalMs <= 0) totalMs = 60000; 
             } else {
                 totalMs = parseInt(val) * 60 * 1000;
@@ -775,19 +737,19 @@
 
         function updateClockUI() {
             if (!useTimer) return;
-            const pColor = document.getElementById('player-color').value;
-            const isFlipped = (pColor === 'b');
+            const isFlipped = (playingColor === 'b');
             const mode = document.getElementById('mode').value;
             
             const topTimeEl = document.getElementById('top-time');
             const bottomTimeEl = document.getElementById('bottom-time');
             const topLabelEl = document.getElementById('top-player-label');
             const bottomLabelEl = document.getElementById('bottom-player-label');
-            const topClock = document.getElementById('top-clock');
-            const bottomClock = document.getElementById('bottom-clock');
             
             if (mode === 'bot') {
                 topLabelEl.innerText = isFlipped ? "Bot (White)" : "Bot (Black)";
+                bottomLabelEl.innerText = isFlipped ? "You (Black)" : "You (White)";
+            } else if (mode === 'online') {
+                topLabelEl.innerText = isFlipped ? "Opponent (White)" : "Opponent (Black)";
                 bottomLabelEl.innerText = isFlipped ? "You (Black)" : "You (White)";
             } else {
                 topLabelEl.innerText = isFlipped ? "White" : "Black";
@@ -807,18 +769,18 @@
             topTimeEl.innerText = formatTime(topTimeMs);
             bottomTimeEl.innerText = formatTime(bottomTimeMs);
             
-            topClock.classList.remove('active-clock');
-            bottomClock.classList.remove('active-clock');
+            document.getElementById('top-clock').classList.remove('active-clock');
+            document.getElementById('bottom-clock').classList.remove('active-clock');
             topTimeEl.classList.remove('low-time');
             bottomTimeEl.classList.remove('low-time');
             
             if (gameActive && !game.game_over() && !isReviewMode && !isAnalyzing) {
                 if (game.turn() === 'w') {
-                    if (isFlipped) topClock.classList.add('active-clock');
-                    else bottomClock.classList.add('active-clock');
+                    if (isFlipped) document.getElementById('top-clock').classList.add('active-clock');
+                    else document.getElementById('bottom-clock').classList.add('active-clock');
                 } else {
-                    if (isFlipped) bottomClock.classList.add('active-clock');
-                    else topClock.classList.add('active-clock');
+                    if (isFlipped) document.getElementById('bottom-clock').classList.add('active-clock');
+                    else document.getElementById('top-clock').classList.add('active-clock');
                 }
             }
             
@@ -827,19 +789,15 @@
         }
 
         function startTimer() {
-            if (!useTimer || gameActive) return;
-            gameActive = true;
+            if (!useTimer) return;
             lastUpdateTime = Date.now();
 
             timerInterval = setInterval(() => {
                 if (!gameActive || game.game_over() || isReviewMode || isAnalyzing) {
-                    clearInterval(timerInterval);
-                    return;
+                    clearInterval(timerInterval); timerInterval = null; return;
                 }
-                
-                const now = Date.now();
-                const delta = now - lastUpdateTime;
-                lastUpdateTime = now;
+                const delta = Date.now() - lastUpdateTime;
+                lastUpdateTime = Date.now();
 
                 if (game.turn() === 'w') {
                     timerWhite -= delta;
@@ -855,10 +813,8 @@
 
         function updateTimeOnMove() {
             if (!useTimer || !gameActive) return;
-            const now = Date.now();
-            const delta = now - lastUpdateTime;
-            lastUpdateTime = now;
-
+            const delta = Date.now() - lastUpdateTime;
+            lastUpdateTime = Date.now();
             if (game.turn() === 'w') {
                 timerWhite -= delta;
                 if (timerWhite <= 0) { timerWhite = 0; handleTimeout('w'); }
@@ -872,10 +828,10 @@
         function handleTimeout(loserColor) {
             gameActive = false;
             clearInterval(timerInterval);
+            timerInterval = null;
             playSound('end');
             
             let winnerColorStr = loserColor === 'w' ? 'Black' : 'White';
-            
             statusEl.innerHTML = `Game over, ${winnerColorStr} wins on time.`;
             document.getElementById('review-btn').style.display = "block"; 
             document.getElementById('resign-btn').style.display = "none";
@@ -892,14 +848,18 @@
             
             gameActive = false;
             clearInterval(timerInterval);
+            timerInterval = null;
             playSound('end');
+
+            const mode = document.getElementById('mode').value;
+            if (mode === 'online' && onlineConn) {
+                onlineConn.send({ type: 'resign' });
+            }
             
-            const playerColor = document.getElementById('player-color').value;
-            let winnerColorStr = playerColor === 'w' ? 'Black' : 'White';
-            let loserColorStr = playerColor === 'w' ? 'White' : 'Black';
+            let winnerColorStr = playingColor === 'w' ? 'Black' : 'White';
+            let loserColorStr = playingColor === 'w' ? 'White' : 'Black';
             
-            statusEl.innerHTML = `Game over, ${loserColorStr} resigned. ${winnerColorStr} wins.`;
-            
+            statusEl.innerHTML = `Game over, you (${loserColorStr}) resigned. ${winnerColorStr} wins.`;
             document.getElementById('resign-btn').style.display = "none";
             document.getElementById('review-btn').style.display = "block"; 
             
@@ -910,13 +870,6 @@
             updateClockUI();
         }
 
-        /* --- GAME LOGIC --- */
-        function toggleGameMode() {
-            const mode = document.getElementById('mode').value;
-            document.getElementById('diff-container').style.display = (mode === 'bot') ? 'flex' : 'none';
-            resetGame();
-        }
-
         function resetGame() {
             game.reset();
             selectedSquare = null;
@@ -924,8 +877,20 @@
             isReviewMode = false;
             isAnalyzing = false;
             gameSaved = false;
-            gameActive = false;
             lastMoveTimestamp = Date.now();
+            
+            const mode = document.getElementById('mode').value;
+            const selColor = document.getElementById('player-color').value;
+
+            // Handle validation color parameters across local frameworks
+            if (mode !== 'online') {
+                gameActive = true; 
+                if (selColor === 'random') {
+                    playingColor = Math.random() < 0.5 ? 'w' : 'b';
+                } else {
+                    playingColor = selColor;
+                }
+            }
             
             setupTimers();
 
@@ -937,11 +902,18 @@
             gameTimesBlack = [timerBlack];
             suggestedMoves = [];
 
-            document.getElementById('main-title').innerText = "Standard Chess (Ultra Fast Engine)";
+            document.getElementById('main-title').innerText = "Standard Chess (Tactical Grandmaster Engine)";
             document.getElementById('game-controls').style.display = "flex";
             document.getElementById('review-controls').style.display = "none";
             document.getElementById('review-btn').style.display = "none";
-            document.getElementById('resign-btn').style.display = "block"; 
+            
+            // Only toggle visual layout variables if a real gameplay engine is initialized
+            if (gameActive) {
+                document.getElementById('resign-btn').style.display = "block";
+            } else {
+                document.getElementById('resign-btn').style.display = "none";
+            }
+
             reviewPanelEl.style.display = "none";
             historySectionEl.style.display = "flex";
             
@@ -949,10 +921,11 @@
             updateStatus();
             updateHistoryUI();
 
-            const mode = document.getElementById('mode').value;
-            const playerColor = document.getElementById('player-color').value;
-            if (mode === 'bot' && playerColor === 'b' && game.turn() === 'w') {
+            if (mode === 'bot' && playingColor === 'b' && game.turn() === 'w') {
                 makeBotMove();
+            }
+            if (gameActive && useTimer) {
+                startTimer();
             }
         }
 
@@ -962,16 +935,14 @@
             gameLastMoves.push({ from: moveObj.from, to: moveObj.to, color: moveObj.color });
             gameTimesWhite.push(timerWhite);
             gameTimesBlack.push(timerBlack);
-            lastMoveTimestamp = Date.now(); // Record exact timestamp for the 1s outline
-            let currentEval = minimax(2, -Infinity, Infinity, game.turn() === 'w');
-            gameEvals.push(currentEval);
+            lastMoveTimestamp = Date.now();
+            gameEvals.push(0); 
         }
 
         function drawBoard() {
             boardEl.innerHTML = '';
             const board = game.board(); 
-            const pColor = document.getElementById('player-color').value;
-            const isFlipped = (pColor === 'b');
+            const isFlipped = (playingColor === 'b');
             
             const rankLabelsEl = document.getElementById('rank-labels');
             const fileLabelsEl = document.getElementById('file-labels');
@@ -987,9 +958,6 @@
             const currentIndex = isReviewMode ? reviewIndex : (gameFens.length - 1);
             const lastMove = gameLastMoves[currentIndex];
             const timeSinceMove = Date.now() - lastMoveTimestamp;
-            
-            // Should we show the outline?
-            // In review mode, always show it. In live play, only show if less than 1000ms has passed.
             let showOutline = isReviewMode || isAnalyzing || timeSinceMove <= 1000;
 
             for (let r = 0; r < 8; r++) {
@@ -1010,23 +978,9 @@
                     if (selectedSquare === squareId) square.classList.add('selected');
                     if (validTargetSquares.includes(squareId)) square.classList.add('valid-move');
                     
-                    // Apply white/black move outlines
                     if (lastMove && (squareId === lastMove.from || squareId === lastMove.to) && showOutline) {
-                        if (lastMove.color === 'w') {
-                            square.classList.add('last-move-white');
-                        } else {
-                            square.classList.add('last-move-black');
-                        }
-                        
-                        // Set timeout to remove the outline class smoothly EXACTLY at the 1 second mark during live play
-                        if (!isReviewMode && !isAnalyzing) {
-                            setTimeout(() => {
-                                if (document.getElementById(squareId)) {
-                                    document.getElementById(squareId).classList.remove('last-move-white');
-                                    document.getElementById(squareId).classList.remove('last-move-black');
-                                }
-                            }, 1000 - timeSinceMove);
-                        }
+                        if (lastMove.color === 'w') square.classList.add('last-move-white');
+                        else square.classList.add('last-move-black');
                     }
 
                     const piece = board[chessJsRow][chessJsCol];
@@ -1047,12 +1001,11 @@
 
         function handleSquareClick(squareId) {
             initAudio(); 
-            if (game.game_over() || isReviewMode || isAnalyzing || (useTimer && (timerWhite === 0 || timerBlack === 0))) return;
+            if (game.game_over() || isReviewMode || isAnalyzing || !gameActive || (useTimer && (timerWhite === 0 || timerBlack === 0))) return;
             
             const mode = document.getElementById('mode').value;
-            const playerColor = document.getElementById('player-color').value;
-            
-            if (mode === 'bot' && game.turn() !== playerColor) return; 
+            if (mode === 'bot' && game.turn() !== playingColor) return;
+            if (mode === 'online' && game.turn() !== playingColor) return;
 
             const pieceOnSquare = game.get(squareId);
 
@@ -1064,7 +1017,11 @@
                 if (moveResult) {
                     recordMove(moveResult); 
                     handleGameSound(moveResult);
-                    if (useTimer && !gameActive) startTimer();
+                    
+                    if (mode === 'online' && onlineConn) {
+                        onlineConn.send({ type: 'move', move: moveResult.san });
+                    }
+                    if (useTimer && !timerInterval) startTimer();
                 }
 
                 selectedSquare = null;
@@ -1084,13 +1041,12 @@
                     selectedSquare = null;
                     validTargetSquares = [];
                 }
-                drawBoard(); // Redraws board to show valid squares
+                drawBoard(); 
             }
         }
 
         function updateStatus() {
             if (useTimer && (timerWhite === 0 || timerBlack === 0)) return; 
-
             let statusHTML = '';
             let moveColor = game.turn() === 'w' ? 'White' : 'Black';
 
@@ -1119,34 +1075,29 @@
                 if (game.in_check()) statusHTML += ' (Check!)';
             }
 
-            // Real-time Opening Tracker for live matching sequence (Both Teams)
             let currentMoves = gameNotationMoves.slice(1);
             if (currentMoves.length > 0) {
                 let openingName = getOpeningName(currentMoves);
                 statusHTML += `<div style="color: #7289da; font-size: 14px; margin-top: 6px; font-weight: normal;">Opening: ${openingName}</div>`;
             }
-
             statusEl.innerHTML = statusHTML;
         }
 
-        /* --- HISTORY LOGIC --- */
+        // ==========================================
+        // HISTORY & REVIEW ENGINE
+        // ==========================================
+
         function saveGameToHistory(resultText) {
             const modeSelect = document.getElementById('mode').value;
-            const playerSide = document.getElementById('player-color').value === 'w' ? 'White' : 'Black';
-            const setupMode = modeSelect === 'friend' 
-                ? `Local (View: ${playerSide})` 
-                : `Bot (${document.getElementById('difficulty').value})`;
+            let setupMode = modeSelect === 'friend' ? `Local Friend` : 
+                            modeSelect === 'online' ? `Online Multiplayer` : 
+                            `Bot (${document.getElementById('difficulty').value})`;
             
             const matchRecord = {
                 date: new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
-                mode: setupMode,
-                result: resultText,
-                fens: [...gameFens],
-                evals: [...gameEvals],
-                moves: [...gameNotationMoves],
-                lastMoves: [...gameLastMoves],
-                timesWhite: [...gameTimesWhite],
-                timesBlack: [...gameTimesBlack],
+                mode: setupMode, result: resultText,
+                fens: [...gameFens], moves: [...gameNotationMoves], lastMoves: [...gameLastMoves],
+                timesWhite: [...gameTimesWhite], timesBlack: [...gameTimesBlack],
                 suggestedMoves: []
             };
 
@@ -1159,13 +1110,10 @@
         function updateHistoryUI() {
             const history = JSON.parse(localStorage.getItem('html_chess_history')) || [];
             const listEl = document.getElementById('history-list');
-            
             let whiteWins = 0, blackWins = 0, draws = 0;
             listEl.innerHTML = '';
 
-            if (history.length === 0) {
-                listEl.innerHTML = '<div style="text-align:center; color:#99aab5; font-size:13px; padding: 15px;">No matches found in history.</div>';
-            }
+            if (history.length === 0) listEl.innerHTML = '<div style="text-align:center; color:#99aab5; font-size:13px; padding: 15px;">No matches found.</div>';
 
             history.forEach((match, index) => {
                 if (match.result.includes('White Wins')) whiteWins++;
@@ -1174,7 +1122,6 @@
 
                 const item = document.createElement('div');
                 item.className = 'history-item';
-                
                 if (match.result.includes('White Wins')) item.style.borderColor = '#43b581';
                 else if (match.result.includes('Black Wins')) item.style.borderColor = '#f2ca5c';
                 else item.style.borderColor = '#7289da';
@@ -1205,34 +1152,32 @@
         }
 
         function clearAllHistory() {
-            if (confirm("Are you sure you want to permanently erase all local game history records?")) {
+            if (confirm("Permanently erase all local game history?")) {
                 localStorage.removeItem('html_chess_history');
                 updateHistoryUI();
             }
         }
 
-        /* --- PRE-CALCULATE MISTAKES LOGIC --- */
         function prepareAnalysis(isFromHistory = false, historyIndex = -1) {
             if (isAnalyzing || gameFens.length <= 1) return;
             isAnalyzing = true;
             gameActive = false;
             clearInterval(timerInterval);
+            timerInterval = null;
             
-            document.getElementById('main-title').innerText = "Game Engine Working...";
+            document.getElementById('main-title').innerText = "Engine Calculating Tactical Lines...";
             document.getElementById('game-controls').style.display = "none";
             document.getElementById('review-controls').style.display = "none";
             historySectionEl.style.display = "none";
             reviewPanelEl.style.display = "none";
             
             suggestedMoves = new Array(gameFens.length).fill(null);
+            gameEvals = new Array(gameFens.length).fill(0);
             let i = 1;
 
-            // Non-blocking async loop to find all mistakes and calculate best moves instantly
             function analyzeNextMove() {
                 if (i >= gameFens.length) {
                     isAnalyzing = false;
-                    
-                    // Save the processed data back into the game history so we don't need to recalculate
                     let history = JSON.parse(localStorage.getItem('html_chess_history')) || [];
                     if (isFromHistory && historyIndex !== -1 && history[historyIndex]) {
                         history[historyIndex].suggestedMoves = suggestedMoves;
@@ -1240,41 +1185,50 @@
                         history[0].suggestedMoves = suggestedMoves;
                     }
                     localStorage.setItem('html_chess_history', JSON.stringify(history));
-
                     startReview();
                     return;
                 }
 
                 let percent = Math.round((i / (gameFens.length - 1)) * 100);
-                statusEl.innerHTML = `Analyzing Game for Mistakes... ${percent}%`;
+                statusEl.innerHTML = `Analyzing Blunders... ${percent}%`;
 
-                game.load(gameFens[i - 1]);
-                let turnBefore = game.turn();
-                
-                let evalBefore = gameEvals[i - 1];
-                let evalAfter = gameEvals[i];
-                let evalDiff = (turnBefore === 'w') ? (evalBefore - evalAfter) : (evalAfter - evalBefore);
-                let pawnDiff = evalDiff / 10;
+                game.load(gameFens[i - 1]); let evalB = evaluateBoardSimple();
+                game.load(gameFens[i]);     let evalA = evaluateBoardSimple();
+                gameEvals[i-1] = evalB; gameEvals[i] = evalA;
 
-                // If the move was an inaccuracy, mistake, or blunder, figure out the best alternative
-                if (pawnDiff > 1.5) {
-                    suggestedMoves[i] = suggestBestMove(gameFens[i - 1]);
-                }
+                let turnBefore = game.load(gameFens[i - 1]) ? game.turn() : 'w';
+                let evalDiff = (turnBefore === 'w') ? (evalB - evalA) : (evalA - evalB);
+                let pawnDiff = evalDiff / 100;
+
+                if (pawnDiff > 1.2) suggestedMoves[i] = "Engine Disagrees";
+                else suggestedMoves[i] = "None";
 
                 i++;
-                setTimeout(analyzeNextMove, 15); // Yield 15ms so the progress bar visually updates 
+                setTimeout(analyzeNextMove, 10); 
             }
             analyzeNextMove();
         }
 
-        /* --- INSTANT REVIEW LOGIC --- */
+        function evaluateBoardSimple() {
+            let evalScore = 0; const board = game.board();
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    const piece = board[r][c];
+                    if (piece) {
+                        const vals = { 'p': 100, 'n': 320, 'b': 330, 'r': 500, 'q': 900, 'k': 20000 };
+                        evalScore += piece.color === 'w' ? vals[piece.type] : -vals[piece.type];
+                    }
+                }
+            }
+            return evalScore;
+        }
+
         function reviewPastGame(index) {
             let history = JSON.parse(localStorage.getItem('html_chess_history')) || [];
             let match = history[index];
             if (!match) return;
 
             gameFens = match.fens;
-            gameEvals = match.evals;
             gameNotationMoves = match.moves;
             gameLastMoves = match.lastMoves || new Array(gameFens.length).fill(null);
             gameTimesWhite = match.timesWhite || new Array(gameFens.length).fill(0);
@@ -1289,12 +1243,10 @@
                 document.getElementById('bottom-clock').style.display = 'none';
             }
 
-            // If the game was already analyzed in the past, just load it instantly
             if (match.suggestedMoves && match.suggestedMoves.length === gameFens.length) {
                 suggestedMoves = match.suggestedMoves;
                 startReview();
             } else {
-                // Otherwise, calculate the mistakes right now before opening it
                 prepareAnalysis(true, index); 
             }
         }
@@ -1303,9 +1255,10 @@
             isReviewMode = true;
             gameActive = false;
             clearInterval(timerInterval);
+            timerInterval = null;
             reviewIndex = 0; 
             
-            document.getElementById('main-title').innerText = "Game Analysis";
+            document.getElementById('main-title').innerText = "Tactical Game Review";
             document.getElementById('game-controls').style.display = "none";
             document.getElementById('review-controls').style.display = "flex";
             historySectionEl.style.display = "none";
@@ -1336,269 +1289,166 @@
 
             if (reviewIndex === 0) {
                 reviewPanelEl.style.display = "block";
-                reviewActorEl.innerText = "Game Start";
+                reviewActorEl.innerText = "Game Setup";
                 reviewTextEl.innerHTML = "Starting Position";
                 reviewPanelEl.className = "review-panel";
-                statusEl.innerHTML = `Opening Position<div style="color: #7289da; font-size: 14px; margin-top: 6px; font-weight: normal;">Opening: ${openingName}</div>`;
-                if (useTimer && gameTimesWhite && gameTimesWhite[reviewIndex] !== undefined) {
-                    let timeStr = `White: ${formatTime(gameTimesWhite[reviewIndex])} | Black: ${formatTime(gameTimesBlack[reviewIndex])}`;
-                    reviewTextEl.innerHTML += `<br><span style="font-size: 13px; color: #ffcc00; margin-top: 6px; display: inline-block;">⏱️ ${timeStr}</span>`;
-                }
-                updateClockUI();
-                return;
+                statusEl.innerHTML = `Opening Layout`;
+                updateClockUI(); return;
             }
 
-            // Figure out whose turn it was previously to properly assign the mistake to White or Black
             game.load(gameFens[reviewIndex - 1]);
             let turnBefore = game.turn();
-            
-            // Immediately restore the board state to the current move visually
             game.load(gameFens[reviewIndex]);
 
-            let evalBefore = gameEvals[reviewIndex - 1];
-            let evalAfter = gameEvals[reviewIndex];
+            let evalBefore = gameEvals[reviewIndex - 1] || 0;
+            let evalAfter = gameEvals[reviewIndex] || 0;
             let rawMovePlayed = gameNotationMoves[reviewIndex]; 
 
             let evalDiff = (turnBefore === 'w') ? (evalBefore - evalAfter) : (evalAfter - evalBefore);
-            let pawnDiff = evalDiff / 10;
+            let pawnDiff = evalDiff / 100;
             let feedback = "", fClass = "";
             
-            if (pawnDiff <= 0.5) { feedback = "Best Move ⭐"; fClass = "best"; }
-            else if (pawnDiff <= 1.5) { feedback = "Good 👍"; fClass = "good"; }
-            else if (pawnDiff <= 3.0) { feedback = "Inaccuracy ⁉️"; fClass = "inaccuracy"; }
-            else if (pawnDiff <= 5.0) { feedback = "Mistake ❓"; fClass = "mistake"; }
-            else { feedback = "Blunder! ❌"; fClass = "blunder"; }
+            if (pawnDiff <= 0.4) { feedback = "Best Strategic Move ⭐"; fClass = "best"; }
+            else if (pawnDiff <= 1.2) { feedback = "Good Choice 👍"; fClass = "good"; }
+            else if (pawnDiff <= 2.5) { feedback = "Inaccuracy Found ⁉️"; fClass = "inaccuracy"; }
+            else if (pawnDiff <= 4.5) { feedback = "Tactical Mistake ❓"; fClass = "mistake"; }
+            else { feedback = "Critical Blunder! ❌"; fClass = "blunder"; }
             
             reviewPanelEl.style.display = "block";
             reviewActorEl.innerText = turnBefore === 'w' ? `White Played: ${rawMovePlayed}` : `Black Played: ${rawMovePlayed}`;
             reviewPanelEl.className = `review-panel ${fClass}`;
-            statusEl.innerHTML = `Reviewing Move ${reviewIndex}<div style="color: #7289da; font-size: 14px; margin-top: 6px; font-weight: normal;">Opening: ${openingName}</div>`;
-
-            // Because we pre-calculated the best moves after the game ended, we can load it instantly
-            if (pawnDiff > 1.5) {
-                let betterMove = suggestedMoves[reviewIndex] || "Unknown";
-                let moveDesc = "";
-
-                // --- ANIMATION & DESCRIPTION LOGIC ---
-                if (betterMove !== "Unknown" && betterMove !== "None") {
-                    try {
-                        // Temporarily load the board state *before* the mistake to parse the suggestion
-                        game.load(gameFens[reviewIndex - 1]);
-                        let parsedMove = game.move(betterMove);
-                        
-                        // Restore the visual board state immediately so the view isn't broken
-                        game.load(gameFens[reviewIndex]);
-                        
-                        if (parsedMove) {
-                            // Apply the pulsing animation class to the 'from' and 'to' squares
-                            let fromSquare = document.getElementById(parsedMove.from);
-                            let toSquare = document.getElementById(parsedMove.to);
-                            if (fromSquare) fromSquare.classList.add('suggested-highlight');
-                            if (toSquare) toSquare.classList.add('suggested-highlight');
-
-                            // Generate clean, readable English translations for algebraic codes
-                            const pieceNames = { 'p': 'Pawn', 'n': 'Knight', 'b': 'Bishop', 'r': 'Rook', 'q': 'Queen', 'k': 'King' };
-                            if (parsedMove.san === 'O-O') {
-                                moveDesc = "Kingside Castle";
-                            } else if (parsedMove.san === 'O-O-O') {
-                                moveDesc = "Queenside Castle";
-                            } else {
-                                let pName = pieceNames[parsedMove.piece] || "Piece";
-                                if (parsedMove.captured) {
-                                    let capName = pieceNames[parsedMove.captured] || "Piece";
-                                    moveDesc = `${pName} takes ${capName} on ${parsedMove.to}`;
-                                } else {
-                                    moveDesc = `${pName} to ${parsedMove.to}`;
-                                }
-                            }
-                        }
-                    } catch(e) {
-                        // Failsafe: if parse fails, just make sure the board state is restored
-                        game.load(gameFens[reviewIndex]); 
-                    }
-                }
-                // --- END ANIMATION LOGIC ---
-                
-                let descHTML = moveDesc ? `<br><span style="font-size: 13px; color: #ffcc00; font-weight: 500;">💡 ${moveDesc}</span>` : "";
-                reviewTextEl.innerHTML = feedback + `<br><span style="font-size: 14px; color: #b9bbbe;">Suggested Move: <strong style="color: #fff;">${betterMove}</strong></span>` + descHTML;
-                
-            } else {
-                reviewTextEl.innerHTML = feedback;
-            }
+            statusEl.innerHTML = `Reviewing Move ${reviewIndex}`;
+            reviewTextEl.innerHTML = feedback;
 
             if (useTimer && gameTimesWhite && gameTimesWhite[reviewIndex] !== undefined) {
-                let timeStr = `White: ${formatTime(gameTimesWhite[reviewIndex])} | Black: ${formatTime(gameTimesBlack[reviewIndex])}`;
-                reviewTextEl.innerHTML += `<br><span style="font-size: 13px; color: #ffcc00; margin-top: 6px; display: inline-block;">⏱️ ${timeStr}</span>`;
+                let timeStr = `W: ${formatTime(gameTimesWhite[reviewIndex])} | B: ${formatTime(gameTimesBlack[reviewIndex])}`;
+                reviewTextEl.innerHTML += `<br><span style="font-size: 12px; color: #ffcc00; margin-top: 6px; display: inline-block;">⏱️ ${timeStr}</span>`;
             }
             updateClockUI();
         }
 
-        /* --- BEST MOVE ENGINE (OPTIMIZED WITH ALPHA-BETA) --- */
-        function suggestBestMove(previousFen) {
-            let currentReviewFen = game.fen();
-            game.load(previousFen); 
+        // ==========================================
+        // BOT ENGINE (WEB WORKER)
+        // ==========================================
 
-            let moves = game.moves();
-            if (moves.length === 0) {
-                game.load(currentReviewFen);
-                return "None";
-            }
-
-            moves.sort((a, b) => (b.includes('x') ? 1 : 0) - (a.includes('x') ? 1 : 0));
-
-            let bestMove = moves[0];
-            let isWhiteTurn = game.turn() === 'w';
-            let bestVal = isWhiteTurn ? -Infinity : Infinity;
-
-            let alpha = -Infinity;
-            let beta = Infinity;
-
-            for (let i = 0; i < moves.length; i++) {
-                game.move(moves[i]);
-                let val = minimax(1, alpha, beta, !isWhiteTurn); 
-                game.undo();
-
-                if (isWhiteTurn) {
-                    if (val > bestVal) { bestVal = val; bestMove = moves[i]; }
-                    alpha = Math.max(alpha, bestVal); 
-                } else {
-                    if (val < bestVal) { bestVal = val; bestMove = moves[i]; }
-                    beta = Math.min(beta, bestVal); 
-                }
-            }
-
-            game.load(currentReviewFen); 
-            return bestMove;
-        }
-
-        /* --- BOT AI LOGIC --- */
         function makeBotMove() {
             if (game.game_over()) return;
-            statusEl.innerHTML = "Bot is thinking...";
+            statusEl.innerHTML = "Bot calculation in progress...";
 
             const difficulty = document.getElementById('difficulty').value;
-            
-            let thinkDelay = 1000;
-            if (difficulty === 'normal') thinkDelay = 1500;
-            if (difficulty === 'hard') thinkDelay = 2000;
-            if (difficulty === 'impossible') thinkDelay = 2500;
+            let thinkDelay = difficulty === 'impossible' ? 10 : 400;
 
             setTimeout(() => {
-                if (game.game_over() || isReviewMode || isAnalyzing) return;
+                if (game.game_over() || isReviewMode || isAnalyzing || document.getElementById('mode').value === 'online') return;
                 
-                const moves = game.moves(); 
-                if (moves.length === 0) return;
-
-                moves.sort((a, b) => (b.includes('x') ? 1 : 0) - (a.includes('x') ? 1 : 0));
-                let bestMove = null;
-
-                if (difficulty === 'easy') {
-                    bestMove = moves[Math.floor(Math.random() * moves.length)];
-                } else {
-                    let depth = 1; 
-                    if (difficulty === 'hard') depth = 2;
-                    if (difficulty === 'impossible') depth = 3; 
-
-                    const isBotWhite = game.turn() === 'w';
-                    let bestVal = isBotWhite ? -Infinity : Infinity; 
+                aiWorker.postMessage({ fen: game.fen(), difficulty: difficulty });
+                
+                aiWorker.onmessage = function(e) {
+                    if (game.game_over() || isReviewMode || isAnalyzing) return;
                     
-                    for (let i = 0; i < moves.length; i++) {
-                        game.move(moves[i]);
-                        
-                        let boardVal = minimax(depth - 1, -Infinity, Infinity, !isBotWhite);
-                        game.undo();
-                        
-                        if (isBotWhite) {
-                            if (boardVal > bestVal) {
-                                bestVal = boardVal;
-                                bestMove = moves[i];
-                            }
-                        } else {
-                            if (boardVal < bestVal) {
-                                bestVal = boardVal;
-                                bestMove = moves[i];
-                            }
-                        }
+                    const { bestMove } = e.data;
+                    if (!bestMove) return;
+
+                    if (useTimer && gameActive) updateTimeOnMove();
+
+                    const botMoveResult = game.move(bestMove);
+                    if (botMoveResult) {
+                        recordMove(botMoveResult); 
+                        handleGameSound(botMoveResult);
+                        if (useTimer && !timerInterval) startTimer();
                     }
-                }
 
-                if (useTimer && gameActive) updateTimeOnMove();
-
-                const botMoveResult = game.move(bestMove);
-                if (botMoveResult) {
-                    recordMove(botMoveResult); 
-                    handleGameSound(botMoveResult);
-                    if (useTimer && !gameActive) startTimer();
-                }
-
-                drawBoard();
-                updateStatus();
-                updateClockUI();
+                    drawBoard();
+                    updateStatus();
+                    updateClockUI();
+                };
             }, thinkDelay);
         }
 
-        function minimax(depth, alpha, beta, isMaximizingPlayer) {
-            if (depth === 0 || game.game_over()) return evaluateBoard();
-
-            const moves = game.moves();
-            moves.sort((a, b) => (b.includes('x') ? 1 : 0) - (a.includes('x') ? 1 : 0));
-
-            if (isMaximizingPlayer) {
-                let bestVal = -Infinity;
-                for (let i = 0; i < moves.length; i++) {
-                    game.move(moves[i]);
-                    bestVal = Math.max(bestVal, minimax(depth - 1, alpha, beta, false));
-                    game.undo();
-                    alpha = Math.max(alpha, bestVal);
-                    if (beta <= alpha) break; 
+        const workerCode = `
+            importScripts('https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js');
+            const openingBook = {
+                "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -": "e4",
+                "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq -": "c5"
+            };
+            function getPieceValue(piece) {
+                const vals = { 'p': 100, 'n': 325, 'b': 335, 'r': 500, 'q': 925, 'k': 20000 };
+                return piece.color === 'w' ? vals[piece.type] : -vals[piece.type];
+            }
+            function evalBoard(gameInst) {
+                let s = 0; const b = gameInst.board();
+                for(let r=0; r<8; r++) for(let c=0; c<8; c++) if(b[r][c]) s += getPieceValue(b[r][c]);
+                return s;
+            }
+            function getMoves(gameInst) {
+                return gameInst.moves({ verbose: true }).sort((a,b) => {
+                    let score = 0;
+                    if(a.captured) score += 100;
+                    if(a.san.includes('+')) score += 50;
+                    return score > 0 ? -1 : 1;
+                });
+            }
+            function minimax(gameInst, depth, alpha, beta, isMax, sTime, mTime) {
+                if (Date.now() - sTime > mTime) return isMax ? -Infinity : Infinity;
+                if (depth === 0 || gameInst.game_over()) return evalBoard(gameInst);
+                const moves = getMoves(gameInst);
+                if (isMax) {
+                    let best = -Infinity;
+                    for (let m of moves) {
+                        gameInst.move(m);
+                        best = Math.max(best, minimax(gameInst, depth-1, alpha, beta, false, sTime, mTime));
+                        gameInst.undo();
+                        alpha = Math.max(alpha, best);
+                        if (beta <= alpha) break;
+                    }
+                    return best;
+                } else {
+                    let best = Infinity;
+                    for (let m of moves) {
+                        gameInst.move(m);
+                        best = Math.min(best, minimax(gameInst, depth-1, alpha, beta, true, sTime, mTime));
+                        gameInst.undo();
+                        beta = Math.min(beta, best);
+                        if (beta <= alpha) break;
+                    }
+                    return best;
                 }
-                return bestVal;
-            } else {
-                let minVal = Infinity;
-                for (let i = 0; i < moves.length; i++) {
-                    game.move(moves[i]);
-                    minVal = Math.min(minVal, minimax(depth - 1, alpha, beta, true));
-                    game.undo();
-                    beta = Math.min(beta, minVal);
-                    if (beta <= alpha) break; 
+            }
+
+            self.onmessage = function(e) {
+                const { fen, difficulty } = e.data;
+                const gameInst = new Chess(fen);
+                const moves = getMoves(gameInst);
+                if (moves.length === 0) return self.postMessage({ bestMove: null });
+
+                let fenKey = fen.split(' ').slice(0, 4).join(' ');
+                if (openingBook[fenKey]) {
+                    let m = moves.find(x => x.san === openingBook[fenKey]);
+                    if(m) return self.postMessage({ bestMove: m });
                 }
-                return minVal;
-            }
-        }
 
-        function evaluateBoard() {
-            let totalEvaluation = 0;
-            for (let i = 0; i < 64; i++) {
-                const sq = SQUARES[i];
-                const piece = game.get(sq);
-                if (piece) totalEvaluation += getPieceValue(piece, sq);
-            }
-            return totalEvaluation;
-        }
+                let bestMove = moves[Math.floor(Math.random() * moves.length)];
+                if (difficulty !== 'easy') {
+                    let sTime = Date.now(), mTime = 3000, depth = difficulty === 'impossible' ? 3 : 2;
+                    let isBotW = gameInst.turn() === 'w';
+                    let bestVal = isBotW ? -Infinity : Infinity;
+                    for (let m of moves) {
+                        gameInst.move(m);
+                        let val = minimax(gameInst, depth-1, -Infinity, Infinity, !isBotW, sTime, mTime);
+                        gameInst.undo();
+                        if (isBotW) { if (val > bestVal) { bestVal = val; bestMove = m; } }
+                        else { if (val < bestVal) { bestVal = val; bestMove = m; } }
+                    }
+                }
+                self.postMessage({ bestMove });
+            };
+        `;
 
-        function getPieceValue(piece, sq) {
-            const pieceValues = { 'p': 10, 'n': 30, 'b': 30, 'r': 50, 'q': 90, 'k': 900 };
-            let val = pieceValues[piece.type];
-            
-            if (piece.type !== 'k') {
-                const c = sq.charCodeAt(0) - 97; 
-                const r = 8 - parseInt(sq[1]);   
-                let centerBonus = (3.5 - Math.abs(3.5 - r)) + (3.5 - Math.abs(3.5 - c));
-                val += centerBonus * 0.5;
-            }
-            return piece.color === 'w' ? val : -val;
-        }
+        const aiBlob = new Blob([workerCode], { type: 'application/javascript' });
+        const aiWorker = new Worker(URL.createObjectURL(aiBlob));
 
-        setupTimers();
-        lastMoveTimestamp = Date.now();
-        gameFens = [game.fen()];
-        gameEvals = [0];
-        gameNotationMoves = [""];
-        gameLastMoves = [null];
-        gameTimesWhite = [timerWhite];
-        gameTimesBlack = [timerBlack];
-        drawBoard();
-        updateHistoryUI();
+        // Initialization
+        toggleGameMode();
     </script>
 </body>
 </html>
