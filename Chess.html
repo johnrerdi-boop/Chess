@@ -172,18 +172,19 @@
                 <div class="online-panel" id="online-container" style="display:none;">
                     <label style="color: #ffcc00; margin-bottom: 5px;">Online Connection</label>
                     <div style="font-size: 13px; color: #b9bbbe; display:flex; justify-content: space-between; align-items: center;">
-                        <span>Your ID: <span id="my-peer-id" style="color:#fff;font-weight:bold;">Loading...</span></span>
+                        <span>Your Room ID: <span id="my-peer-id" style="color:#fff;font-weight:bold;font-size:18px;letter-spacing:2px;">Loading...</span></span>
                         <button onclick="copyPeerId()" class="btn-small" style="margin: 0;">Copy</button>
                     </div>
-                    <input type="text" id="friend-id-input" placeholder="Paste Friend's ID here">
+                    <input type="text" id="friend-id-input" placeholder="Enter 4-Digit Duel ID" maxlength="4" style="text-transform: uppercase; font-family: monospace; letter-spacing: 1px; text-align: center; font-size: 18px;">
                     <button onclick="playUiSound(); connectToFriend()" style="background: #43b581;">Send Duel Request</button>
                     
                     <div id="duel-request-panel" style="display: none; background: #1e2124; padding: 12px; border-radius: 6px; border: 2px dashed #f2ca5c; margin-top: 10px; text-align: center;">
                         <span style="font-size: 13px; color: #fff; display: block; margin-bottom: 8px;">
-                            Duel Request From: <br><strong id="incoming-peer-id" style="color: #ffcc00; font-size: 11px; word-break: break-all;"></strong>
+                            Duel Request From: <br><strong id="incoming-peer-id" style="color: #ffcc00; font-size: 18px; letter-spacing:2px;"></strong>
                         </span>
-                        <div style="display: flex; gap: 8px;">
-                            <button onclick="acceptDuel()" style="background: #43b581; padding: 6px; font-size: 13px;">Accept</button>
+                        <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
+                            <button onclick="acceptDuel('w')" style="background: #e2e2e2; color: #23272a; padding: 6px; font-size: 13px; font-weight: bold;">Play White</button>
+                            <button onclick="acceptDuel('b')" style="background: #2c2f33; color: #fff; border: 1px solid #7289da; padding: 6px; font-size: 13px; font-weight: bold;">Play Black</button>
                             <button onclick="declineDuel()" style="background: #f04747; padding: 6px; font-size: 13px;">Decline</button>
                         </div>
                     </div>
@@ -360,11 +361,14 @@
         }
 
         // ==========================================
-        // ONLINE MULTIPLAYER PEERJS LOGIC
+        // ONLINE MULTIPLAYER PEERJS LOGIC (EASY IDs)
         // ==========================================
         
         function initPeerJS() {
-            peer = new Peer();
+            // Generate an easy 4-character alphanumeric ID
+            const easyId = Math.random().toString(36).substring(2, 6).toUpperCase();
+            
+            peer = new Peer(easyId);
             peer.on('open', id => {
                 document.getElementById('my-peer-id').innerText = id;
             });
@@ -373,6 +377,16 @@
                 isOnlineHost = true;
                 setupOnlineConnection(true);
             });
+            peer.on('error', err => {
+                if (err.type === 'unavailable-id') {
+                    document.getElementById('online-status').innerText = "ID clash! Re-rolling...";
+                    peer.destroy();
+                    setTimeout(initPeerJS, 500); // Try again if the 4 digit string is taken globally
+                } else {
+                    document.getElementById('online-status').innerText = "Connection error: " + err.type;
+                    document.getElementById('online-status').style.color = "#f04747";
+                }
+            });
         }
 
         function copyPeerId() {
@@ -380,13 +394,19 @@
             const idText = document.getElementById('my-peer-id').innerText;
             if (idText !== "Loading...") {
                 navigator.clipboard.writeText(idText);
-                alert("Your Online ID has been copied to your clipboard. Send it to your friend!");
+                alert("Your 4-Digit Duel ID has been copied! Send it to your friend.");
             }
         }
 
         function connectToFriend() {
-            const id = document.getElementById('friend-id-input').value.trim();
-            if (!id) return;
+            // Convert input to uppercase to match generated easy IDs
+            const id = document.getElementById('friend-id-input').value.trim().toUpperCase();
+            
+            if (!id || id.length !== 4) {
+                alert("Please enter a valid 4-character Duel ID.");
+                return;
+            }
+            
             document.getElementById('online-status').innerText = "Sending Duel Request...";
             document.getElementById('online-status').style.color = "#f2ca5c";
             
@@ -459,7 +479,7 @@
             });
         }
 
-        function acceptDuel() {
+        function acceptDuel(chosenColor) {
             playUiSound();
             if (!onlineConn) return;
 
@@ -467,12 +487,12 @@
             document.getElementById('online-status').innerText = "Connected! Match Synchronized.";
             document.getElementById('online-status').style.color = "#43b581";
 
-            let selColor = document.getElementById('player-color').value;
-            let playingColor = selColor;
+            // Update the local dropdown so the board flips correctly for the host
+            document.getElementById('player-color').value = chosenColor;
             
             onlineConn.send({
                 type: 'start',
-                hostColor: playingColor,
+                hostColor: chosenColor,
                 timeControl: document.getElementById('time-control').value,
                 cH: document.getElementById('custom-hours').value,
                 cM: document.getElementById('custom-minutes').value,
